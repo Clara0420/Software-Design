@@ -11,7 +11,6 @@ interface XmlElement {
 }
 
 const numberPattern = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
-const supported = new Set(['rect', 'circle', 'ellipse', 'line', 'text', 'g']);
 
 export class SvgParser {
   constructor(private readonly factory = new ShapeFactory()) {}
@@ -31,7 +30,7 @@ export class SvgParser {
 
     const build = (element: XmlElement, parent: Document | Group): void => {
       const type = this.localName(element.name);
-      if (!supported.has(type)) throw new Error(`unsupported SVG element: ${type}`);
+      if (!this.factory.supports(type)) throw new Error(`unsupported SVG element: ${type}`);
       const id = this.idFor(element, type, usedIds, counters, warnings);
       const parameters = this.parameters(element, type);
       const shape = this.factory.hydrate(type, id, parameters, this.styles(element));
@@ -51,16 +50,14 @@ export class SvgParser {
   }
 
   private parameters(element: XmlElement, type: string): ShapeParameters {
-    const number = (name: string) => this.number(element, name);
-    switch (type) {
-      case 'rect': return { x: number('x'), y: number('y'), width: number('width'), height: number('height') };
-      case 'circle': return { cx: number('cx'), cy: number('cy'), r: number('r') };
-      case 'ellipse': return { cx: number('cx'), cy: number('cy'), rx: number('rx'), ry: number('ry') };
-      case 'line': return { x1: number('x1'), y1: number('y1'), x2: number('x2'), y2: number('y2') };
-      case 'text': return { x: number('x'), y: number('y'), text: element.text };
-      case 'g': return {};
-      default: throw new Error(`unsupported SVG element: ${type}`);
+    const parameters: Record<string, number | string> = {};
+    for (const spec of this.factory.parametersFor(type)) {
+      if (spec.name === 'fill' || spec.name === 'stroke') continue;
+      parameters[spec.name] = spec.kind === 'string'
+        ? element.text
+        : this.number(element, spec.name);
     }
+    return parameters;
   }
 
   private styles(element: XmlElement): ShapeStyles {

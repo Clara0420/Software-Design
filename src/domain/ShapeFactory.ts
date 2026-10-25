@@ -48,6 +48,10 @@ export class ShapeFactory {
     return Object.freeze(specs.map(spec => Object.freeze(spec)));
   }
 
+  supports(type: string): boolean {
+    return this.#definitions.has(type);
+  }
+
   create(type: string, id: string, parameters: ShapeParameters): Shape {
     const definition = this.definition(type);
     const specs = this.parametersFor(type);

@@ -60,6 +60,19 @@ describe('SVG parsing and serialization', () => {
     expect(result.document.findById('nested')?.fill).toBeUndefined();
   });
 
+  it('derives element parameters from the shape factory schema', () => {
+    const result = parser.parse(`<svg width="10" height="20">
+      <rect id="r" x="1" y="2" width="3" height="4"/>
+      <circle id="c" cx="1" cy="2" r="3"/>
+      <ellipse id="e" cx="1" cy="2" rx="3" ry="4"/>
+      <line id="l" x1="1" y1="2" x2="3" y2="4"/>
+      <text id="t" x="1" y="2">value</text>
+      <g id="g"/>
+    </svg>`);
+    expect(result.elementCount).toBe(6);
+    expect((result.document.findById('t') as TextShape).text).toBe('value');
+  });
+
   it('round-trips to a stable canonical SVG without losing model state', () => {
     const first = parser.parse(completeSvg).document;
     const serialized = serializer.serialize(first);
