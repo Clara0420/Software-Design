@@ -5,6 +5,7 @@ import type { ShapeVisitor } from './ShapeVisitor.js';
 
 export interface AttributeBinding {
   readonly kind: 'number' | 'string';
+  readonly read: () => number | string | undefined;
   readonly prepare: (value: number | string) => () => void;
 }
 
@@ -49,6 +50,12 @@ export abstract class Shape {
     return binding.kind;
   }
 
+  attributeValue(attribute: string): number | string | undefined {
+    const binding = this.attributes().get(attribute);
+    if (!binding) throw new Error(`unknown attribute: ${attribute}`);
+    return binding.read();
+  }
+
   set(attribute: string, value: number | string): void { this.prepareSet(attribute, value)(); }
 
   /** Used by trusted model construction to restore an explicitly stored value without Composite propagation. */
@@ -65,14 +72,14 @@ export abstract class Shape {
 
   protected attributes(): ReadonlyMap<string, AttributeBinding> {
     return new Map([
-      ['fill', this.stringAttribute(value => { this.#fill = value; })],
-      ['stroke', this.stringAttribute(value => { this.#stroke = value; })],
-      ['stroke-width', this.numberAttribute(value => { this.#strokeWidth = value; }, true)],
+      ['fill', this.stringAttribute(() => this.#fill, value => { this.#fill = value; })],
+      ['stroke', this.stringAttribute(() => this.#stroke, value => { this.#stroke = value; })],
+      ['stroke-width', this.numberAttribute(() => this.#strokeWidth, value => { this.#strokeWidth = value; }, true)],
     ]);
   }
 
-  protected numberAttribute(write: (value: number) => void, nonNegative = false): AttributeBinding {
-    return { kind: 'number', prepare: value => {
+  protected numberAttribute(read: () => number | undefined, write: (value: number) => void, nonNegative = false): AttributeBinding {
+    return { kind: 'number', read, prepare: value => {
       if (typeof value !== 'number' || !Number.isFinite(value) || (nonNegative && value < 0)) {
         throw new Error(nonNegative ? 'attribute must be finite and non-negative' : 'attribute must be finite');
       }
@@ -80,8 +87,8 @@ export abstract class Shape {
     } };
   }
 
-  protected stringAttribute(write: (value: string) => void): AttributeBinding {
-    return { kind: 'string', prepare: value => {
+  protected stringAttribute(read: () => string | undefined, write: (value: string) => void): AttributeBinding {
+    return { kind: 'string', read, prepare: value => {
       if (typeof value !== 'string') throw new Error('attribute must be a string');
       return () => write(value);
     } };

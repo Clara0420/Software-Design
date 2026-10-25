@@ -16,13 +16,13 @@ const run = (input: string) => {
 
 describe('CLI process', () => {
   it('exits on EOF, including empty input', () => {
-    expect(run('')).toContain('supported commands: init, read, save, canvas, create (rect/circle/ellipse/line/text/g), tree');
+    expect(run('')).toContain("svg-editor 0.1 — type 'help' for commands");
   });
 
   it('runs init → create rect → tree with ordered roots, floats and optional fill', () => {
     const output = run('init 400 200\r\ncreate rect first -1.5 20 100 50 #eee\r\ncreate rect second 0 0 2 3\r\ntree');
     expect(output).toContain('canvas 400x200 created\nrect#first created\nrect#second created\n');
-    expect(output).toContain('svg (400x200)\n├── rect#first  x=-1.5 y=20 w=100 h=50 fill=#eee\n└── rect#second  x=0 y=0 w=2 h=3\n');
+    expect(output).toContain('svg (400x200)\n├── rect#first     x=-1.5 y=20 w=100 h=50 fill=#eee\n└── rect#second    x=0 y=0 w=2 h=3\n');
     expect(output).not.toContain('error:');
   });
 
@@ -37,7 +37,7 @@ describe('CLI process', () => {
     const output = run('tree\ncreate rect r 0 0 1 1\nrotate r 90\ninit\ncreate rect r 0 0 1 1\ntree\n');
     expect(output.match(/error: no document/g)).toHaveLength(2);
     expect(output).toContain('error: unknown command: rotate');
-    expect(output).toContain('└── rect#r  x=0 y=0 w=1 h=1');
+    expect(output).toContain('└── rect#r         x=0 y=0 w=1 h=1');
   });
 
   it('leaves existing state unchanged after invalid init, duplicate IDs and invalid geometry', () => {
@@ -49,7 +49,7 @@ describe('CLI process', () => {
     ].join('\n'));
     expect(output.match(/^error:/gm)).toHaveLength(6);
     expect(output).toContain('error: id already exists: r');
-    expect(output).toContain('svg (100x200)\n└── rect#r  x=1 y=2 w=3 h=4\n');
+    expect(output).toContain('svg (100x200)\n└── rect#r         x=1 y=2 w=3 h=4\n');
     expect(output).not.toContain('bad created');
   });
 
@@ -63,7 +63,7 @@ describe('CLI process', () => {
     expect(output).toContain('error: no such shape: missing');
     expect(output).toContain('error: no such container: missing');
     expect(output).toContain('error: not a container: r');
-    expect(output).toContain('svg (800x600)\n└── rect#r  x=0 y=0 w=1 h=1');
+    expect(output).toContain('svg (800x600)\n└── rect#r         x=0 y=0 w=1 h=1');
   });
 
   it('recovers from malformed syntax and replaces the document only on successful init', () => {
@@ -95,7 +95,7 @@ describe('CLI process', () => {
     for (const type of ['g#node', 'rect#r', 'circle#c', 'ellipse#e', 'line#l', 'text#t']) {
       expect(output).toContain(`${type} created in g#`);
     }
-    expect(output).toContain('svg (800x600)\n├── g#scene\n│   ├── g#node\n│   │   ├── rect#r  x=1 y=2 w=30 h=40 fill=#eee\n│   │   ├── circle#c  cx=5.5 cy=-6 r=7 fill=red\n│   │   ├── ellipse#e  cx=8 cy=9 rx=10 ry=11\n│   │   └── text#t  (12,13) "开始 in node #标题"\n│   └── line#l  (-1,-2) -> (3,4) stroke=blue\n└── text#empty  (0,0) ""');
+    expect(output).toContain('svg (800x600)\n├── g#scene\n│   ├── g#node\n│   │   ├── rect#r x=1 y=2 w=30 h=40 fill=#eee\n│   │   ├── circle#c cx=5.5 cy=-6 r=7 fill=red\n│   │   ├── ellipse#e cx=8 cy=9 rx=10 ry=11\n│   │   └── text#t (12,13) "开始 in node #标题"\n│   └── line#l     (-1,-2) -> (3,4) stroke=blue\n└── text#empty     (0,0) ""');
   });
 
   it('checks cross-type IDs and container targets for newly supported types', () => {
@@ -110,8 +110,8 @@ describe('CLI process', () => {
     expect(output).toContain('id already exists: root');
     expect(output).toContain('no such container: missing');
     expect(output).toContain('not a container: c');
-    expect(output).toContain('text#t  (0,0) "in"');
-    expect(output).toContain('circle#C  cx=0 cy=0 r=0');
+    expect(output).toContain('text#t     (0,0) "in"');
+    expect(output).toContain('circle#C       cx=0 cy=0 r=0');
   });
 
   it('rejects malformed new-type commands without poisoning subsequent commands', () => {
@@ -125,7 +125,7 @@ describe('CLI process', () => {
     ].join('\n'));
     expect(output.match(/^error:/gm)).toHaveLength(10);
     expect(output).not.toContain('bad created');
-    expect(output).toContain('svg (800x600)\n└── g#root\n    └── ellipse#good  cx=0 cy=0 rx=0 ry=0');
+    expect(output).toContain('svg (800x600)\n└── g#root\n    └── ellipse#good cx=0 cy=0 rx=0 ry=0');
   });
 
 
@@ -152,10 +152,10 @@ it('undoes nested group movement as a unit and preserves redo across failures', 
   expect(output).toContain('g#outer moved by (10,20)\ng#outer moved back by (-10,-20)');
   expect(output).toContain('error: no such shape: missing');
   expect(output).toContain('error: id already exists: outer');
-  expect(output).toContain('rect#r  x=10 y=20 w=10 h=20');
-  expect(output).toContain('text#t  (15,26) "hi"');
+  expect(output).toContain('rect#r x=10 y=20 w=10 h=20');
+  expect(output).toContain('text#t (15,26) "hi"');
   expect(output).toContain('error: nothing to redo');
-  expect(output).toContain('rect#r  x=0 y=0 w=10 h=20');
+  expect(output).toContain('rect#r x=0 y=0 w=10 h=20');
 });
 
 it('reports history/move syntax errors and does not revisit the old document after init', () => {
@@ -188,10 +188,10 @@ it('runs recursive set/scale and undo/redo with exact errors in the real CLI', (
   expect(output).toContain('error: no such shape: missing');
   expect(output).toContain('error: undo not allowed after io command');
   expect(output).toContain('text#t updated: text');
-  expect(output).toContain('rect#r  x=2 y=4 w=6 h=8 stroke-width=2');
-  expect(output).toContain('text#t  (10,12) "new 中文 text" stroke-width=2');
-  expect(output).toContain('rect#r  x=1 y=2 w=3 h=4\n');
-  expect(output).toContain('text#t  (5,6) "old"\n');
+  expect(output).toContain('rect#r     x=2 y=4 w=6 h=8 stroke-width=2');
+  expect(output).toContain('text#t     (10,12) "new 中文 text" stroke-width=2');
+  expect(output).toContain('rect#r     x=1 y=2 w=3 h=4\n');
+  expect(output).toContain('text#t     (5,6) "old"\n');
   expect(output).toContain('error: unknown attribute: x');
   expect(output).toContain('error: unknown attribute: id');
   expect(output.match(/error: scale factor must be positive/g)).toHaveLength(2);
@@ -207,8 +207,8 @@ it('groups in original order, promotes children in place and reverses each comma
   ].join('\n'));
   expect(output).not.toContain('error:');
   expect(output).toContain('g#pair created with 2 children');
-  expect(output).toContain('svg (800x600)\n└── g#parent\n    ├── g#pair\n    │   ├── rect#a  x=1 y=2 w=3 h=4\n    │   └── circle#b  cx=5 cy=6 r=7\n    └── g#end');
-  expect(output).toContain('g#pair ungrouped\nsvg (800x600)\n└── g#parent\n    ├── rect#a  x=1 y=2 w=3 h=4\n    ├── circle#b  cx=5 cy=6 r=7\n    └── g#end');
+  expect(output).toContain('svg (800x600)\n└── g#parent\n    ├── g#pair\n    │   ├── rect#a x=1 y=2 w=3 h=4\n    │   └── circle#b cx=5 cy=6 r=7\n    └── g#end');
+  expect(output).toContain('g#pair ungrouped\nsvg (800x600)\n└── g#parent\n    ├── rect#a     x=1 y=2 w=3 h=4\n    ├── circle#b   cx=5 cy=6 r=7\n    └── g#end');
   expect(output).toContain('g#pair added to g#destination');
   expect(output).toContain('g#pair returned to g#parent');
 });
@@ -227,7 +227,7 @@ it('reports root/cycle/selection errors and keeps structural redo intact', () =>
   expect(output).toContain('error: no such shape: missing');
   expect(output).toContain('error: not a container: r');
   expect(output).toContain('error: usage: addto');
-  expect(output.endsWith('svg (800x600)\n└── g#root\n    └── g#inner\n        └── g#pair\n            └── rect#r  x=0 y=0 w=1 h=1\n')).toBe(true);
+  expect(output.endsWith('svg (800x600)\n└── g#root\n    └── g#inner\n        └── g#pair\n            └── rect#r x=0 y=0 w=1 h=1\n')).toBe(true);
 });
 
 it('deletes and restores a complete subtree with its IDs and original slot', () => {
@@ -241,7 +241,7 @@ it('deletes and restores a complete subtree with its IDs and original slot', () 
   expect(output).toContain('svg (800x600)\n└── g#parent\n    ├── g#before\n    └── g#after');
   expect(output).toContain('error: no such shape: r');
   expect(output).toContain('g#target restored');
-  expect(output).toContain('g#target\n├── rect#r  x=1 y=2 w=3 h=4\n└── text#t  (5,6) "hello"');
+  expect(output).toContain('g#target\n├── rect#r         x=1 y=2 w=3 h=4\n└── text#t         (5,6) "hello"');
   expect(output).toContain('error: no such shape: target');
 });
 
@@ -255,7 +255,7 @@ it('moves root and nested shapes front/back and reverses each order change', () 
   expect(output).toContain('g#c sent to back');
   expect(output).toContain('└── g#a');
   expect(output).toContain('    ├── g#c\n    ├── g#b\n    │   └── rect#child');
-  expect(output.endsWith('svg (800x600)\n└── g#root\n    ├── g#a\n    ├── g#b\n    │   └── rect#child  x=0 y=0 w=1 h=1\n    └── g#c\n')).toBe(true);
+  expect(output.endsWith('svg (800x600)\n└── g#root\n    ├── g#a\n    ├── g#b\n    │   └── rect#child x=0 y=0 w=1 h=1\n    └── g#c\n')).toBe(true);
 });
 
 it('reports delete/front/back errors without consuming redo', () => {
@@ -289,12 +289,12 @@ it('saves and reads a six-shape nested document through real files', () => {
     expect(output).not.toContain('error:');
     expect(output).toContain(`saved to ${path} (6 elements)`);
     expect(output).toContain(`read ${path} (6 elements)`);
-    expect(output).toContain('svg (400x300)\n└── g#scene stroke=black');
-    expect(output).toContain('rect#r  x=1 y=2 w=3 h=4 fill=#eee stroke=black stroke-width=1.5');
-    expect(output).toContain('circle#c  cx=5 cy=6 r=7 fill=red stroke=black');
+    expect(output).toContain('svg (400x300)\n└── g#scene        stroke=black');
+    expect(output).toContain('rect#r     x=1 y=2 w=3 h=4 fill=#eee stroke=black stroke-width=1.5');
+    expect(output).toContain('circle#c   cx=5 cy=6 r=7 fill=red stroke=black');
     expect(output).toContain('ellipse#e  cx=8 cy=9 rx=10 ry=11 stroke=black');
-    expect(output).toContain('line#l  (1,2) -> (3,4) stroke=black');
-    expect(output).toContain('text#t  (12,13) "A & B < 中文" stroke=black');
+    expect(output).toContain('line#l     (1,2) -> (3,4) stroke=black');
+    expect(output).toContain('text#t     (12,13) "A & B < 中文" stroke=black');
     const saved = readFileSync(path, 'utf8');
     expect(saved).toContain('<text id="t" stroke="black" x="12" y="13">A &amp; B &lt; 中文</text>');
     expect(saved).toContain('viewBox="0 0 400 300"');
@@ -349,4 +349,27 @@ it('reports file errors, preserves state on failure and enforces every successfu
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+it('prints help and show, scopes tree by ID and recovers from parser and command errors', () => {
+  const output = run([
+    'help', 'show missing', 'init', 'create g root',
+    'create text title 20 40 "A \\"quoted\\" title" in root',
+    'create circle c1 100 80 12 red in root', 'tree root', 'show c1',
+    'show', 'show missing', 'help extra', 'show "c1"tail', 'tree root extra',
+    'show title',
+  ].join('\n'));
+  expect(output).toContain("svg-editor 0.1 — type 'help' for commands\nCommands:");
+  expect(output).toContain('  create text <id> <x> <y> <text> [in <containerId>]');
+  expect(output).toContain('g#root\n├── text#title     (20,40) "A \\"quoted\\" title"\n└── circle#c1      cx=100 cy=80 r=12 fill=red');
+  expect(output).toContain('circle#c1  parent=g#root\n  cx=100 cy=80 r=12\n  fill=red');
+  expect(output).toContain('text#title  parent=g#root\n  x=20 y=40\n  text="A \\"quoted\\" title"');
+  expect(output).not.toContain('svg (800x600)\n');
+  expect(output.match(/^error:/gm)).toHaveLength(6);
+  expect(output).toContain("error: no document. use 'init' or 'read' first");
+  expect(output).toContain('error: usage: show <id>');
+  expect(output).toContain('error: no such shape: missing');
+  expect(output).toContain('error: usage: help');
+  expect(output).toContain('error: unexpected character after closing quote');
+  expect(output).toContain('error: usage: tree [id]');
 });

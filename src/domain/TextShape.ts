@@ -35,9 +35,9 @@ export class TextShape extends Shape {
   protected override attributes(): ReadonlyMap<string, AttributeBinding> {
     return new Map([
       ...super.attributes(),
-      ['x', this.numberAttribute(value => { this.#x = value; })],
-      ['y', this.numberAttribute(value => { this.#y = value; })],
-      ['text', this.stringAttribute(value => { this.#text = value; })],
+      ['x', this.numberAttribute(() => this.#x, value => { this.#x = value; })],
+      ['y', this.numberAttribute(() => this.#y, value => { this.#y = value; })],
+      ['text', this.stringAttribute(() => this.#text, value => { this.#text = value; })],
     ]);
   }
 

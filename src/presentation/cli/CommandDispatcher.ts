@@ -1,6 +1,8 @@
 import type { EditorSession } from '../../application/EditorSession.js';
 import { TreeFormatter } from '../formatters/TreeFormatter.js';
 import { EditResultFormatter } from '../formatters/EditResultFormatter.js';
+import { ShowFormatter } from '../formatters/ShowFormatter.js';
+import { HelpFormatter } from '../formatters/HelpFormatter.js';
 import { CommandParser, type Token } from './CommandParser.js';
 
 export class CommandDispatcher {
@@ -11,6 +13,8 @@ export class CommandDispatcher {
     private readonly parser = new CommandParser(),
     private readonly formatter = new TreeFormatter(),
     private readonly editFormatter = new EditResultFormatter(),
+    private readonly showFormatter = new ShowFormatter(),
+    private readonly helpFormatter = new HelpFormatter(),
   ) {
     this.#handlers = new Map([
       ['init', args => this.init(args.map(token => token.value))],
@@ -19,6 +23,7 @@ export class CommandDispatcher {
       ['canvas', args => this.canvas(args.map(token => token.value))],
       ['create', args => this.create(args)],
       ['tree', args => this.tree(args.map(token => token.value))],
+      ['show', args => this.show(args.map(token => token.value))],
       ['move', args => this.move(args.map(token => token.value))],
       ['set', args => this.set(args.map(token => token.value))],
       ['scale', args => this.scale(args.map(token => token.value))],
@@ -30,6 +35,7 @@ export class CommandDispatcher {
       ['back', args => this.reorder('back', args.map(token => token.value))],
       ['undo', args => this.undo(args)],
       ['redo', args => this.redo(args)],
+      ['help', args => this.help(args)],
     ]);
   }
 
@@ -176,5 +182,16 @@ export class CommandDispatcher {
     return args[0] === undefined
       ? this.formatter.document(document)
       : this.formatter.shape(this.session.findById(args[0]));
+  }
+
+  private show(args: string[]): string {
+    void this.session.document;
+    if (args.length !== 1 || args[0] === undefined) throw new Error('usage: show <id>');
+    return this.showFormatter.shape(this.session.findById(args[0]));
+  }
+
+  private help(args: Token[]): string {
+    if (args.length !== 0) throw new Error('usage: help');
+    return this.helpFormatter.format();
   }
 }

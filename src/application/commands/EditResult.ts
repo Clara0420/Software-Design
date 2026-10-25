@@ -15,6 +15,7 @@ export type EditResult = {
   readonly action: 'updated' | 'updated back';
   readonly shape: Shape;
   readonly attribute: string;
+  readonly value: number | string | undefined;
 } | {
   readonly action: 'scaled' | 'scaled back';
   readonly shape: Shape;

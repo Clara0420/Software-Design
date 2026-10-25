@@ -39,7 +39,7 @@ describe('delete and history', () => {
     expect(t.parent).toBe(nested);
 
     const deleted = cli.dispatch('tree');
-    expect(cli.dispatch('undo')).toBe('g#target restored');
+    expect(cli.dispatch('undo')).toBe('g#target restored into g#parent');
     expect(cli.dispatch('tree')).toBe(before);
     expect(session.findById('target')).toBe(target);
     expect(session.findById('r')).toBe(r);

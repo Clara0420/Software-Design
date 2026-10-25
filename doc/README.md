@@ -274,3 +274,13 @@ init、成功 read、成功 save、成功 canvas 修改都会清空既有 undo/r
 测试新增 Infrastructure 解析/序列化与真实文件仓储测试、Application port/路径/屏障测试，以及真实 CLI 文件 round-trip。覆盖六种图形、嵌套和空 Group、全部公共样式、XML 实体与中文、缺失 ID 及冲突避让、递归计数、Unicode/空格路径、读取/写入/解析错误、无参数 save 路径复用、失败原子性、canvas 查询与修改、四类 I/O 屏障和 save→read→save 稳定性。
 
 验证：全工程 TypeScript 检查、生产构建通过；Vitest 13 个文件、150 项测试全部通过。未新增依赖，未实现 box、插件、CSS 或通用 SVG transform，未执行 Git Commit/Push/Tag。
+
+### tree / show / help 与 CLI 输出契约（2026-10-25）
+
+本轮补齐 `tree [id]`、`show <id>` 和 `help`。TreeFormatter 继续通过 ShapeVisitor 读取六种图形，以 `svg (WxH)` 为文档根，使用树枝字符表达层级，并将关键几何与显式样式内联到固定属性列；`tree <id>` 只输出该节点及其后代，不输出 svg 根或兄弟节点。ShowFormatter 同样使用 ShapeVisitor，输出单个节点的类型/id、直接父容器、完整几何或文本、显式公共样式；Group 只显示直接子节点数量，不递归展开。HelpFormatter 集中维护当前阶段全部命令的准确语法。三者都位于 Presentation 层，只读取 Domain，不修改模型也不进入命令历史。
+
+REPL 启动文案改为需求指定的 `svg-editor 0.1 — type 'help' for commands`。CommandParser 保留整行 `#` 注释、空白分词和空引号语义，并支持双引号字符串内的 `\"` 与 `\\`；未闭合引号、引号粘连到未引用参数、闭合引号后的非空白字符均给出单行错误。所有命令的参数数量错误继续使用 `usage:`，REPL 统一添加 `error:` 并在错误后处理后续输入。
+
+编辑反馈补齐当前属性值：set、undo、redo 分别输出例如 `text#title updated: text="My Diagram v2"` 与 `text#title updated back: text="My Diagram"`。AttributeBinding 增加只读取值函数，由各 Shape 继续封装自己的属性；SetCommand 将执行后的值放进结构化 EditResult，Presentation 不按图形类型反查。delete 的撤销反馈包含恢复位置，例如 `rect#box restored into g#markers`。依赖方向仍为 Presentation → Application → Domain，没有新增命令层或 Infrastructure 依赖。
+
+测试新增六种图形 show、完整 help、tree 子树范围、固定列格式、字符串转义与非法引号、错误后继续执行，以及 set/delete 撤销重做反馈；真实 CLI 集成测试覆盖启动文案、成功输出、usage/no document/no such shape/parser 错误的统一格式。验证：全工程 TypeScript 检查、生产构建通过；Vitest 14 个文件、155 项测试全部通过。未实现 box 插件，未新增依赖，未执行 Git Commit/Push/Tag。

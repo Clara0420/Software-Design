@@ -12,13 +12,13 @@ export class SetCommand implements Command<EditResult> {
     const restore = this.shape.saveState();
     this.shape.set(this.attribute, this.value);
     this.#restore = restore;
-    return { action: 'updated', shape: this.shape, attribute: this.attribute };
+    return { action: 'updated', shape: this.shape, attribute: this.attribute, value: this.shape.attributeValue(this.attribute) };
   }
 
   undo(): EditResult {
     if (!this.#restore) throw new Error('command has not been executed');
     this.#restore();
     this.#restore = undefined;
-    return { action: 'updated back', shape: this.shape, attribute: this.attribute };
+    return { action: 'updated back', shape: this.shape, attribute: this.attribute, value: this.shape.attributeValue(this.attribute) };
   }
 }

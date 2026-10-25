@@ -12,25 +12,39 @@ export class CommandParser {
     if (line.trimStart().startsWith('#')) return [];
     const tokens: Token[] = [];
     let token = '';
-    let quoted = false;
+    let inQuote = false;
     let started = false;
     let wasQuoted = false;
-    for (const character of line) {
+    let closedQuote = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index]!;
+      if (inQuote && character === '\\') {
+        const next = line[index + 1];
+        if (next === '"' || next === '\\') {
+          token += next;
+          index += 1;
+          continue;
+        }
+      }
       if (character === '"') {
-        quoted = !quoted;
+        if (!inQuote && started) throw new Error('unexpected double quote');
+        inQuote = !inQuote;
         wasQuoted = true;
         started = true;
-      } else if (/\s/.test(character) && !quoted) {
+        if (!inQuote) closedQuote = true;
+      } else if (/\s/.test(character) && !inQuote) {
         if (started) tokens.push({ value: token, quoted: wasQuoted });
         token = '';
         started = false;
         wasQuoted = false;
+        closedQuote = false;
       } else {
+        if (closedQuote) throw new Error('unexpected character after closing quote');
         token += character;
         started = true;
       }
     }
-    if (quoted) throw new Error('unterminated double quote');
+    if (inQuote) throw new Error('unterminated double quote');
     if (started) tokens.push({ value: token, quoted: wasQuoted });
     return tokens;
   }

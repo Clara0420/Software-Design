@@ -23,11 +23,18 @@ export class EditResultFormatter implements ShapeVisitor<Description> {
     if ('container' in result) {
       return `${description.label} ${result.action} ${'id' in result.container ? `g#${result.container.id}` : 'svg'}`;
     }
-    if ('attribute' in result) return `${description.label} ${result.action}: ${result.attribute}`;
+    if ('attribute' in result) {
+      const value = typeof result.value === 'string' ? JSON.stringify(result.value) : String(result.value);
+      return `${description.label} ${result.action}: ${result.attribute}=${value}`;
+    }
     if ('factor' in result) return `${description.label} ${result.action}${result.action === 'scaled' ? ` by ${result.factor}` : ''}`;
     if (!('dx' in result)) {
       const parent = result.shape.parent;
-      const suffix = result.action === 'created' && parent && 'id' in parent ? ` in g#${parent.id}` : '';
+      const suffix = result.action === 'created' && parent && 'id' in parent
+        ? ` in g#${parent.id}`
+        : result.action === 'restored' && parent
+          ? ` into ${'id' in parent ? `g#${parent.id}` : 'svg'}`
+          : '';
       return `${description.label} ${result.action}${suffix}`;
     }
     const location = description.position === undefined

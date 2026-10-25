@@ -35,9 +35,9 @@ export class Circle extends Shape {
   protected override attributes(): ReadonlyMap<string, AttributeBinding> {
     return new Map([
       ...super.attributes(),
-      ['cx', this.numberAttribute(value => { this.#cx = value; })],
-      ['cy', this.numberAttribute(value => { this.#cy = value; })],
-      ['r', this.numberAttribute(value => { this.#r = value; }, true)],
+      ['cx', this.numberAttribute(() => this.#cx, value => { this.#cx = value; })],
+      ['cy', this.numberAttribute(() => this.#cy, value => { this.#cy = value; })],
+      ['r', this.numberAttribute(() => this.#r, value => { this.#r = value; }, true)],
     ]);
   }
 

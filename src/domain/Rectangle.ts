@@ -38,10 +38,10 @@ export class Rectangle extends Shape {
   protected override attributes(): ReadonlyMap<string, AttributeBinding> {
     return new Map([
       ...super.attributes(),
-      ['x', this.numberAttribute(value => { this.#x = value; })],
-      ['y', this.numberAttribute(value => { this.#y = value; })],
-      ['width', this.numberAttribute(value => { this.#width = value; }, true)],
-      ['height', this.numberAttribute(value => { this.#height = value; }, true)],
+      ['x', this.numberAttribute(() => this.#x, value => { this.#x = value; })],
+      ['y', this.numberAttribute(() => this.#y, value => { this.#y = value; })],
+      ['width', this.numberAttribute(() => this.#width, value => { this.#width = value; }, true)],
+      ['height', this.numberAttribute(() => this.#height, value => { this.#height = value; }, true)],
     ]);
   }
 

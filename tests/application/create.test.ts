@@ -53,7 +53,7 @@ describe('creation application', () => {
     doc.add(outer);
     const dispatcher = new CommandDispatcher(session);
     expect(dispatcher.dispatch('create rect r 1 2 3 4 red in inner')).toBe('rect#r created in g#inner');
-    expect(dispatcher.dispatch('tree')).toBe('svg (800x600)\n└── g#outer\n    └── g#inner\n        └── rect#r  x=1 y=2 w=3 h=4 fill=red');
+    expect(dispatcher.dispatch('tree')).toBe('svg (800x600)\n└── g#outer\n    └── g#inner\n        └── rect#r x=1 y=2 w=3 h=4 fill=red');
     expect(doc.findById('r')?.parent).toBe(inner);
   });
 });

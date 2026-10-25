@@ -38,10 +38,10 @@ export class Line extends Shape {
   protected override attributes(): ReadonlyMap<string, AttributeBinding> {
     return new Map([
       ...super.attributes(),
-      ['x1', this.numberAttribute(value => { this.#x1 = value; })],
-      ['y1', this.numberAttribute(value => { this.#y1 = value; })],
-      ['x2', this.numberAttribute(value => { this.#x2 = value; })],
-      ['y2', this.numberAttribute(value => { this.#y2 = value; })],
+      ['x1', this.numberAttribute(() => this.#x1, value => { this.#x1 = value; })],
+      ['y1', this.numberAttribute(() => this.#y1, value => { this.#y1 = value; })],
+      ['x2', this.numberAttribute(() => this.#x2, value => { this.#x2 = value; })],
+      ['y2', this.numberAttribute(() => this.#y2, value => { this.#y2 = value; })],
     ]);
   }
 

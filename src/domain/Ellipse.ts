@@ -38,10 +38,10 @@ export class Ellipse extends Shape {
   protected override attributes(): ReadonlyMap<string, AttributeBinding> {
     return new Map([
       ...super.attributes(),
-      ['cx', this.numberAttribute(value => { this.#cx = value; })],
-      ['cy', this.numberAttribute(value => { this.#cy = value; })],
-      ['rx', this.numberAttribute(value => { this.#rx = value; }, true)],
-      ['ry', this.numberAttribute(value => { this.#ry = value; }, true)],
+      ['cx', this.numberAttribute(() => this.#cx, value => { this.#cx = value; })],
+      ['cy', this.numberAttribute(() => this.#cy, value => { this.#cy = value; })],
+      ['rx', this.numberAttribute(() => this.#rx, value => { this.#rx = value; }, true)],
+      ['ry', this.numberAttribute(() => this.#ry, value => { this.#ry = value; }, true)],
     ]);
   }
 
