@@ -1,8 +1,8 @@
-# SVG CLI Editor — Phase 1
+# PROJECT SVG CLI Editor — Phase 1
 
-## 当前阶段与运行方式
+## 1. 当前阶段与运行方式
 
-权威需求见 [phase_cli_1.md](../requirements/phase_cli_1.md)，开发约束见 [AGENTS.md](../AGENTS.md)。当前已实现最小 Domain 模型及 `init → create rect → tree` CLI 功能链。本文原始架构方案与早期记录保留为历史背景；当前实现范围、命名调整及验证结果见文末最新记录。
+Phase 1 已完成六种内置图形、全部规定 CLI 命令、Command/Composite、SVG I/O、原子性约束及测试验证。
 
 使用 Node.js 24.x 和 npm。首次安装执行 `npm ci`（依赖锁定后）；开发命令：
 
@@ -16,7 +16,7 @@
 
 采用原生 ESM 与 NodeNext 模块解析，相对模块导入使用运行时的 .js 扩展名。启用 strict、索引访问检查、精确可选属性、显式 override 和未使用代码检查。基础配置检查测试，独立构建配置只输出 src，避免把测试发布到 dist。仅引入 TypeScript、Node 类型声明和 Vitest 作为开发依赖，无业务运行时依赖。
 
-## 架构方案
+## 2. 架构方案
 
 ### 模块职责与计划类
 
@@ -27,12 +27,12 @@
 | application | 会话入口与操作协调、撤销重做 | EditorSession、CommandHistory |
 | application/commands | 一次编辑操作与恢复信息 | EditCommand、各具体编辑命令 |
 | application/ports | 声明应用需要的外部能力 | DocumentRepository |
-| domain | 唯一当前文档树、ID 与结构约束、图形工厂 | SvgDocument、ShapeFactory |
-| domain/shapes | 图形行为、几何数据封装及容器递归 | Shape、Rectangle、Circle、Ellipse、Line、TextShape、Group |
-| infrastructure | SVG XML 解析、序列化、文件读写 | SvgReader、SvgWriter、SvgRepository |
+| domain | 唯一当前文档树、ID 与结构约束、图形工厂 | Document、ShapeCollection、ShapeFactory |
+| domain | 图形行为、几何数据封装、树结构与类型工厂 | Shape、Document、ShapeCollection、Rectangle、Circle、Ellipse、Line、TextShape、Group、ShapeFactory |
+| infrastructure | SVG XML 解析、序列化、文件读写 | SvgParser、SvgSerializer、SvgFileRepository |
 | main.ts | 创建具体对象、注入依赖、启动应用 | 本轮仅为可运行入口 |
 
-采用 SvgDocument 避免与 DOM Document 混淆，采用 EditCommand 明确可撤销编辑接口。EditorSession 作为应用入口并封装会话状态，暂不引入仅做转发的 EditorService。DocumentRepository 是应用层接口，SvgRepository 是基础设施实现。
+实际实现使用 `Document` 作为领域文档名称，并未引入 DOM 类型。`Command` 明确可撤销编辑接口，`EditorSession` 封装会话状态，`DocumentRepository` 是 Application port，`SvgFileRepository` 是 Infrastructure 实现。没有增加仅做转发的 EditorService。
 
 ```text
 src/
@@ -43,14 +43,12 @@ src/
     commands/
     ports/
   domain/
-    shapes/
   infrastructure/
   main.ts
 tests/
-  unit/
-    domain/
-    application/
-    presentation/
+  domain/
+  application/
+  presentation/
   integration/
   fixtures/
 examples/
@@ -66,24 +64,35 @@ doc/
 
 ```plantuml
 @startuml
-package "Presentation" as P
-package "Application" as A {
-  interface DocumentRepository as Repository
+skinparam componentStyle rectangle
+
+package "Presentation" as P {
+  component "CLI and Formatters" as Presentation
 }
-package "Domain" as D
+package "Application" as A {
+  component "EditorSession" as Session
+  component "CommandHistory" as History
+  component "DocumentRepository\n(port)" as Repository
+}
+package "Domain" as D {
+  component "Document / Shape / Group" as Model
+  component "ShapeFactory" as Factory
+}
 package "Infrastructure" as I {
-  class SvgRepository
+  component "SvgFileRepository" as SvgRepository
 }
 component "main.ts" as Main
-P --> A : 调用会话入口
-P --> D : 只读格式化
-A --> D : 操作模型
-I --> D : 构建与读取模型
+Presentation --> Session : 调用会话入口
+Presentation --> Model : 只读格式化
+Session --> History : 管理命令历史
+Session --> Model : 操作模型
 SvgRepository ..|> Repository : 实现存储接口
+SvgRepository --> Model : 解析/序列化
+Session --> Repository : 依赖端口
 Main --> P
 Main --> A
 Main --> I
-Main --> D
+Main --> Factory : 组装依赖
 @enduml
 ```
 
@@ -96,19 +105,19 @@ Main --> D
 
 ### Command 设计意图
 
-将一次编辑封装成 EditCommand，保存撤销所需旧值、父节点和位置等信息。CommandHistory 统一管理 execute/undo/redo 顺序；EditorSession 协调当前文档、文件路径与历史。命令组织操作，几何计算仍由图形负责。
+将一次编辑封装成具体 `Command`，保存撤销所需旧值、父节点、位置或树变更信息。`CommandHistory` 统一管理 execute/undo/redo 顺序；`EditorSession` 协调当前文档、文件路径与历史。命令组织操作，几何计算仍由图形负责。
 
-最终目标是一条编辑命令一个撤销单元，失败不影响模型或历史，undo 后的新编辑清空 redo。显示操作不入栈；成功的 init/read/save/canvas 修改按需求禁止 undo/redo，直到下一次编辑。具体恢复机制与屏障行为将在命令阶段验证，不在本轮生成接口或栈实现。
+实际行为是一条成功编辑命令一个撤销单元；失败命令不改变模型或历史，undo 后的新编辑清空 redo。显示操作不入栈；成功的 init/read/save/canvas 修改设置 I/O 屏障，直到下一次成功编辑才解除。创建、属性、移动、缩放使用对象状态恢复；删除、分组、解组、收编及层级排序使用 `TreeChange` 保存原节点引用和前后子节点序列。
 
 ### Composite 设计意图与单树约束
 
-Shape 定义图形统一行为，叶子图形实现自身几何变化，Group 持有有序子节点并递归执行容器操作。SvgDocument 维护全局 ID 和树结构约束，避免每条命令分别维护节点归属规则。属性操作遵守需求白名单，不将未来 box 的属性传播规则套到普通 g。
+Shape 定义图形统一行为，叶子图形实现自身几何变化，Group 持有有序子节点并递归执行容器操作。Document 和 ShapeCollection 维护全局 ID、单父节点、无环和有序树约束，避免每条命令分别维护节点归属规则。属性操作遵守 Phase 1 白名单，不将未来 box 的属性传播规则套到普通 g。
 
 一个会话仅有一棵当前文档树；显示与保存读取同一份模型。ID 索引只引用节点，历史记录不是另一棵长期同步的当前树。Lab1 实现必要的容器语义，不提前实现 Lab2 插件、适配器或装饰器框架。
 
 ### 分派位置与待重构点
 
-按名字分派集中在 CommandDispatcher（命令名到处理入口）与 ShapeFactory（类型名到具体图形）两处，并标记为后续待重构点。增加类型时不得在 Reader、Writer、Formatter 中重复 switch(type/tag)。这些模块如何消费多态接口将在对应阶段设计，不预先添加额外模式。
+按名字分派集中在 CommandDispatcher（命令名到处理入口）与 ShapeFactory（类型名到具体图形）两处，并作为未来插件化/注册机制的变化点记录。SvgParser 通过 ShapeFactory 的参数 schema 读取 SVG，SvgSerializer 和 Formatter 通过 ShapeVisitor 消费多态接口；这些层不复制 `switch(type/tag)`。
 
 ### 初步变化点假设
 
@@ -141,17 +150,26 @@ Shape 定义图形统一行为，叶子图形实现自身几何变化，Group �
 
 ## 一致性自查
 
-- 模块目录已按方案建立；尚无业务类，不能据此声称最终实现符合全部架构。
-- 当前 main.ts 仅打印工程状态，无跨业务层依赖；后续每阶段抽样检查 import、模型修改入口和文件系统调用位置。
-- 未执行 Git Commit、Push、Tag，由用户检查后手动完成。
+- **模块划分：通过。** 实际目录为 `presentation/`、`application/`、`domain/`、`infrastructure/` 四层，且 `main.ts` 仅负责组装 `EditorSession`、`CommandDispatcher`、`REPL` 和 `SvgFileRepository`。早期记录中的 `domain/shapes/`、`SvgDocument`、`SvgRepository` 是方案阶段名称，已在本文件中按实际类名修订。
+- **依赖方向：通过。** Domain 仅依赖 Domain；Application 依赖 Domain 和 `application/ports`；Presentation 依赖 Application、Domain 的只读模型和自身 formatter；Infrastructure 依赖 Application port 与 Domain；具体 Infrastructure 未被 Application 直接导入。`src/main.ts` 是唯一组装入口。
+- **单树约束：通过。** `EditorSession` 维护一个当前 `Document`；`Document.findById` 遍历当前树，显示与保存读取同一模型；历史命令保存恢复信息，不维护第二份图形状态。
+- **分派约束：通过。** 命令名分派集中于 `CommandDispatcher`，图形类型注册集中于 `ShapeFactory`。最终审查移除了 `SvgParser` 中重复的类型 `switch`，解析参数改由工厂 schema 驱动。
+- **OOP/模式：通过。** Shape 层次和 `ShapeVisitor` 提供多态；`CommandHistory` 与具体 Command 落地 Command；`Group`、`ShapeCollection` 和统一 Shape API 落地 Composite；字段通过私有成员和只读 getter 封装。
+- **版本控制：未执行。** 本阶段未自动执行 Git Commit、Push、Tag，按开发约束由用户检查后手动完成。
 
 ## 功能完整性与质量保证
 
-当前仅验证工程可构建、配置与测试可类型检查、入口可在 Node 中启动。测试结果以实际运行记录为准；此阶段测试不代表 SVG 功能验收。
+质量保证采用“需求条款—领域单元测试—Application 历史测试—Presentation/Infrastructure 测试—真实 CLI 集成测试—完整构建”的多层验证方式。重点检查：
 
-后续按阶段补充领域测试、命令执行与恢复测试、CLI 错误测试、SVG 往返测试，以及需求典型会话回放。重点验证失败不改变状态、ID 唯一、树结构顺序、容器递归和 I/O 后历史限制。
+- 六种内置图形及完整参数/属性白名单；
+- ID 唯一且大小写敏感、单父容器、无环和树顺序；
+- Group 与叶子统一的 move/scale/set/delete Composite 语义；
+- 每条编辑命令一个撤销单元、undo/redo、redo 清空和 I/O 屏障；
+- 失败命令不改变模型、树结构或历史；
+- SVG 读取、自动补 ID、警告、实体、嵌套、序列化 round-trip；
+- CLI 语法、引号、错误前缀、tree/show/help 输出及真实子进程行为。
 
-尚未实现：REPL、init/create/tree/show/help、六种图形、move/set/scale、group/ungroup/addto、delete/front/back、undo/redo、read/save/canvas，以及相应错误行为。box、插件与 GUI 不在 Phase 1 范围内。
+`box`、插件系统、GUI、CSS 和通用 SVG `transform` 未实现，这是 Phase 1 的明确边界，不是验收遗漏。
 
 ### 本轮验证记录（2026-10-25）
 
@@ -284,3 +302,52 @@ REPL 启动文案改为需求指定的 `svg-editor 0.1 — type 'help' for comma
 编辑反馈补齐当前属性值：set、undo、redo 分别输出例如 `text#title updated: text="My Diagram v2"` 与 `text#title updated back: text="My Diagram"`。AttributeBinding 增加只读取值函数，由各 Shape 继续封装自己的属性；SetCommand 将执行后的值放进结构化 EditResult，Presentation 不按图形类型反查。delete 的撤销反馈包含恢复位置，例如 `rect#box restored into g#markers`。依赖方向仍为 Presentation → Application → Domain，没有新增命令层或 Infrastructure 依赖。
 
 测试新增六种图形 show、完整 help、tree 子树范围、固定列格式、字符串转义与非法引号、错误后继续执行，以及 set/delete 撤销重做反馈；真实 CLI 集成测试覆盖启动文案、成功输出、usage/no document/no such shape/parser 错误的统一格式。验证：全工程 TypeScript 检查、生产构建通过；Vitest 14 个文件、155 项测试全部通过。未实现 box 插件，未新增依赖，未执行 Git Commit/Push/Tag。
+
+### 最终审查与文档收口（2026-10-25）
+
+用户要求对照 Phase 1 全文审查功能、Command/Composite、四层依赖、OOP、操作原子性和测试覆盖。审查先读取 [AGENTS.md](../AGENTS.md)、[phase_cli_1.md](../requirements/phase_cli_1.md)、源码目录和全部测试，并先运行完整测试作为基线：14 个测试文件、155 项测试通过。
+
+基线审查确认核心功能、历史管理、树约束、I/O 屏障和测试覆盖均已存在；唯一需要修复的架构问题是 `SvgParser` 中存在按 SVG 标签复制的 `switch(type)`，与“类型分派只集中在 CommandDispatcher 和 ShapeFactory”的约束冲突。修复保持行为不变：
+
+1. `ShapeFactory` 新增 `supports(type)`，由注册表判断类型；
+2. `SvgParser` 改为读取 `ShapeFactory.parametersFor(type)` 返回的参数 schema，不再复制六种类型的参数分支；
+3. 增加 schema 驱动的六种 SVG 元素解析测试；
+4. 再次执行完整测试、类型检查和生产构建，结果为 14 个测试文件、156 项测试全部通过。
+
+这次修复没有实现插件系统、没有扩展 Phase 1 类型、没有进行无关重构，也没有修改业务行为。
+
+## Phase 1 最终验收
+
+| 验收项 | 结论 | 证据/实现位置 |
+| --- | --- | --- |
+| REPL、提示符、注释、引号和统一错误输出 | 通过 | `presentation/cli/REPL.ts`、`CommandParser.ts`；真实 CLI 集成测试 |
+| `init/read/save/canvas` | 通过 | `EditorSession.ts`、`SvgFileRepository.ts`、`SvgParser.ts`、`SvgSerializer.ts` |
+| 六种内置类型及 create 参数 | 通过 | `ShapeFactory.ts`、六个具体 Shape 类、create 测试 |
+| ID 唯一、大小写敏感、自动补 ID | 通过 | `ShapeCollection.ts`、`Document.ts`、SVG 测试 |
+| `move/scale/set` 的叶子和 Group 递归语义 | 通过 | `Shape.ts`、具体图形类、`Group.ts`、set/scale 测试 |
+| `group/ungroup/addto/delete/front/back` | 通过 | `Document.ts`、`TreeChange.ts`、对应 Command 和拓扑测试 |
+| Command、undo/redo 粒度与 I/O 屏障 | 通过 | `CommandHistory.ts`、`application/commands/`、history/I/O 测试 |
+| 失败不改变任何状态 | 通过 | 几何预校验、`TreeChange` 提交前校验、失败历史测试 |
+| tree/show/help 输出 | 通过 | `presentation/formatters/`、输出格式测试 |
+| SVG round-trip、实体、嵌套和样式 | 通过 | `SvgParser.ts`、`SvgSerializer.ts`、Infrastructure 测试 |
+| 四层依赖与 OOP/Composite 规范 | 通过 | import 抽样、ShapeVisitor、多态 Shape、架构图及最终审查 |
+| Phase 1 范围控制 | 通过 | 未实现 box、插件、GUI、通用 transform |
+
+## 最终质量证据
+
+在最终代码状态执行：
+
+```text
+npm.cmd test
+```
+
+该命令按 `package.json` 先执行 `typecheck` 和 `build`，再运行 Vitest。最终结果：
+
+```text
+TypeScript typecheck: passed
+Production build: passed
+Test Files: 14 passed (14)
+Tests: 156 passed (156)
+```
+
+因此，本 README 的验收结论只声明已实际验证的 Phase 1 范围；没有把未实现的后续插件能力或未明确的外部 SVG 兼容策略计入通过项。
