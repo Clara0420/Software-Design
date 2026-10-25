@@ -1,4 +1,4 @@
-# PROJECT SVG Editor — Phase 1
+# PROJECT SVG Editor — Phase 1 CLI Editor
 
 ## 1. 当前阶段与运行方式
 
@@ -135,29 +135,18 @@ Shape 定义图形统一行为，叶子图形实现自身几何变化，Group �
 - **模块划分** 实际目录为 `presentation/`、`application/`、`domain/`、`infrastructure/` 四层，且 `main.ts` 仅负责组装 `EditorSession`、`CommandDispatcher`、`REPL` 和 `SvgFileRepository`。早期记录中的 `domain/shapes/`、`SvgDocument`、`SvgRepository` 是方案阶段名称，已在本文件中按实际类名修订。
 - **依赖方向。** Domain 仅依赖 Domain；Application 依赖 Domain 和 `application/ports`；Presentation 依赖 Application、Domain 的只读模型和自身 formatter；Infrastructure 依赖 Application port 与 Domain；具体 Infrastructure 未被 Application 直接导入。`src/main.ts` 是唯一组装入口。
 
-## 5. 功能完整性与质量保证
+## 5. 功能完整性与质量保障
 
-每个新增 feature 都补充了单元测试，并在需要时增加真实 CLI 集成测试：
+每个新增 feature 都补充了对应的单元测试，并在需要时增加真实 CLI 集成测试。测试重点如下：
 
-| Feature | 测试重点 |
-| --- | --- |
-| `init`、六种图形与 `create` | 参数/几何校验、样式、文本引号、嵌套创建、ID 唯一和失败原子性 |
-| `move`、`scale`、`set` | 叶子与 Group 递归、属性白名单、溢出恢复、撤销重做 |
-| `group`、`ungroup`、`addto` | 父子关系、顺序、循环检测、节点身份和单步撤销 |
-| `delete`、`front`、`back` | 子树恢复、z-order、原位置和 redo |
-| `read`、`save`、`canvas` | SVG round-trip、自动补 ID、警告、文件/尺寸错误、I/O 屏障 |
-| `tree`、`show`、`help`、REPL | 输出格式、命令语法、引号、错误前缀和真实进程会话 |
+- **六种图形与 create**：参数校验、几何边界、样式、文本引号、嵌套创建和错误原子性。
+- **move / scale / set**：叶子与 Group 的递归行为、属性白名单、溢出失败恢复和撤销重做。
+- **group / ungroup / addto**：父子关系、顺序、循环检测、节点身份及单步撤销。
+- **delete / front / back**：整棵子树删除恢复、z-order、原位置恢复和 redo 行为。
+- **read / save / canvas**：SVG round-trip、自动补 ID、警告、文件错误、尺寸校验和 I/O 后 undo/redo 限制。
+- **tree / show / help 与 REPL**：输出格式、命令语法、引号、错误前缀和真实进程会话。
 
-另外覆盖 SVG 实体与嵌套、单树结构、失败不改变模型或历史，以及 Command/Composite 核心约束。
-
-### 最终验证结果
-
-- `npm.cmd test`：通过。
-- TypeScript typecheck：通过。
-- Production build：通过。
-- Vitest：14 个测试文件、156 项测试全部通过。
-
-## 6. 最终质量证据
+测试同时覆盖 ID 唯一性、单树结构、失败不改变模型或历史，以及 Command/Composite 的核心约束。
 
 在最终代码状态执行：
 
