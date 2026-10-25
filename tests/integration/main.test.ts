@@ -194,3 +194,35 @@ it('runs recursive set/scale and undo/redo with exact errors in the real CLI', (
   expect(output.match(/error: scale factor must be positive/g)).toHaveLength(2);
   expect(output).toContain('error: invalid number: nope');
 });
+
+it('groups in original order, promotes children in place and reverses each command in one step', () => {
+  const output = run([
+    'init', 'create g parent', 'create rect a 1 2 3 4 in parent',
+    'create circle b 5 6 7 in parent', 'create g end in parent',
+    'group pair b a', 'tree', 'ungroup pair', 'tree', 'undo', 'tree',
+    'create g destination', 'addto destination pair', 'tree', 'undo', 'tree',
+  ].join('\n'));
+  expect(output).not.toContain('error:');
+  expect(output).toContain('g#pair created with 2 children');
+  expect(output).toContain('svg (800x600)\n└── g#parent\n    ├── g#pair\n    │   ├── rect#a  x=1 y=2 w=3 h=4\n    │   └── circle#b  cx=5 cy=6 r=7\n    └── g#end');
+  expect(output).toContain('g#pair ungrouped\nsvg (800x600)\n└── g#parent\n    ├── rect#a  x=1 y=2 w=3 h=4\n    ├── circle#b  cx=5 cy=6 r=7\n    └── g#end');
+  expect(output).toContain('g#pair added to g#destination');
+  expect(output).toContain('g#pair returned to g#parent');
+});
+
+it('reports root/cycle/selection errors and keeps structural redo intact', () => {
+  const output = run([
+    'group x a', 'ungroup x', 'addto x a', 'init',
+    'create g root', 'create g inner in root', 'create rect r 0 0 1 1 in inner',
+    'group pair r', 'undo', 'ungroup root', 'group bad root r', 'addto inner root',
+    'group bad r r', 'group bad missing', 'ungroup r', 'addto root', 'redo', 'tree',
+  ].join('\n'));
+  expect(output.match(/error: no document/g)).toHaveLength(3);
+  expect(output).toContain('error: cannot ungroup top-level container: root');
+  expect(output.match(/error: cannot group a container into its own descendant: root/g)).toHaveLength(2);
+  expect(output).toContain('error: cannot group the same shape twice');
+  expect(output).toContain('error: no such shape: missing');
+  expect(output).toContain('error: not a container: r');
+  expect(output).toContain('error: usage: addto');
+  expect(output.endsWith('svg (800x600)\n└── g#root\n    └── g#inner\n        └── g#pair\n            └── rect#r  x=0 y=0 w=1 h=1\n')).toBe(true);
+});

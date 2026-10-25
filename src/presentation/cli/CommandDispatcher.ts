@@ -19,6 +19,9 @@ export class CommandDispatcher {
       ['move', args => this.move(args.map(token => token.value))],
       ['set', args => this.set(args.map(token => token.value))],
       ['scale', args => this.scale(args.map(token => token.value))],
+      ['group', args => this.group(args.map(token => token.value))],
+      ['ungroup', args => this.ungroup(args.map(token => token.value))],
+      ['addto', args => this.addTo(args.map(token => token.value))],
       ['undo', args => this.undo(args)],
       ['redo', args => this.redo(args)],
     ]);
@@ -80,6 +83,25 @@ export class CommandDispatcher {
     void this.session.document;
     if (args.length !== 0) throw new Error('usage: undo');
     return this.editFormatter.format(this.session.undo());
+  }
+
+  private group(args: string[]): string {
+    void this.session.document;
+    const [id, ...ids] = args;
+    if (id === undefined || ids.length === 0) throw new Error('usage: group <newGid> <id1> [id2 ...]');
+    return this.editFormatter.format(this.session.group(id, ids));
+  }
+
+  private ungroup(args: string[]): string {
+    void this.session.document;
+    if (args.length !== 1 || args[0] === undefined) throw new Error('usage: ungroup <gid>');
+    return this.editFormatter.format(this.session.ungroup(args[0]));
+  }
+
+  private addTo(args: string[]): string {
+    void this.session.document;
+    if (args.length !== 2 || args[0] === undefined || args[1] === undefined) throw new Error('usage: addto <gid> <id>');
+    return this.editFormatter.format(this.session.addTo(args[0], args[1]));
   }
 
   private set(args: string[]): string {

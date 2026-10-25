@@ -15,6 +15,14 @@ interface Description {
 export class EditResultFormatter implements ShapeVisitor<Description> {
   format(result: EditResult): string {
     const description = result.shape.accept(this);
+    if ('count' in result) {
+      return result.action === 'grouped'
+        ? `${description.label} created with ${result.count} children`
+        : `${description.label} ${result.action}`;
+    }
+    if ('container' in result) {
+      return `${description.label} ${result.action} ${'id' in result.container ? `g#${result.container.id}` : 'svg'}`;
+    }
     if ('attribute' in result) return `${description.label} ${result.action}: ${result.attribute}`;
     if ('factor' in result) return `${description.label} ${result.action}${result.action === 'scaled' ? ` by ${result.factor}` : ''}`;
     if (!('dx' in result)) {

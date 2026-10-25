@@ -6,6 +6,9 @@ import { CreateCommand } from './commands/CreateCommand.js';
 import { MoveCommand } from './commands/MoveCommand.js';
 import { SetCommand } from './commands/SetCommand.js';
 import { ScaleCommand } from './commands/ScaleCommand.js';
+import { GroupCommand } from './commands/GroupCommand.js';
+import { UngroupCommand } from './commands/UngroupCommand.js';
+import { AddToCommand } from './commands/AddToCommand.js';
 import type { EditResult } from './commands/EditResult.js';
 import { CommandHistory } from './CommandHistory.js';
 
@@ -67,6 +70,25 @@ export class EditorSession {
   redo(): EditResult {
     void this.document;
     return this.#history.redo();
+  }
+
+  group(id: string, ids: readonly string[]): EditResult {
+    const document = this.document;
+    return this.#history.execute(new GroupCommand(document, id, ids.map(value => this.findById(value))));
+  }
+
+  ungroup(id: string): EditResult {
+    return this.#history.execute(new UngroupCommand(this.document, this.findGroup(id)));
+  }
+
+  addTo(groupId: string, id: string): EditResult {
+    return this.#history.execute(new AddToCommand(this.document, this.findGroup(groupId), this.findById(id)));
+  }
+
+  private findGroup(id: string): Group {
+    const shape = this.findById(id);
+    if (!(shape instanceof Group)) throw new Error(`not a container: ${id}`);
+    return shape;
   }
 
   findById(id: string): Shape {
