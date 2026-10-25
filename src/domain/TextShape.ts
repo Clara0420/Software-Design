@@ -15,6 +15,10 @@ export class TextShape extends Shape {
   get y(): number { return this.#y; }
   get text(): string { return this.#text; }
   override accept<T>(visitor: ShapeVisitor<T>): T { return visitor.text(this); }
+  override savePosition(): () => void {
+    const x = this.#x; const y = this.#y;
+    return () => { this.#x = x; this.#y = y; };
+  }
   protected override prepareMove(dx: number, dy: number): () => void {
     const x = this.#x + dx; const y = this.#y + dy;
     if (![x, y].every(Number.isFinite)) throw new Error('resulting coordinates must be finite');

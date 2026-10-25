@@ -19,6 +19,11 @@ export class Line extends Shape {
   get y2(): number { return this.#y2; }
   get stroke(): string | undefined { return this.#stroke; }
   override accept<T>(visitor: ShapeVisitor<T>): T { return visitor.line(this); }
+  override savePosition(): () => void {
+    const x1 = this.#x1; const y1 = this.#y1;
+    const x2 = this.#x2; const y2 = this.#y2;
+    return () => { this.#x1 = x1; this.#y1 = y1; this.#x2 = x2; this.#y2 = y2; };
+  }
   protected override prepareMove(dx: number, dy: number): () => void {
     const x1 = this.#x1 + dx; const y1 = this.#y1 + dy;
     const x2 = this.#x2 + dx; const y2 = this.#y2 + dy;

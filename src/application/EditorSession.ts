@@ -3,9 +3,13 @@ import { Group } from '../domain/Group.js';
 import type { Shape } from '../domain/Shape.js';
 import { ShapeFactory, type ShapeParameters, type ParameterSpec } from '../domain/ShapeFactory.js';
 import { CreateCommand } from './commands/CreateCommand.js';
+import { MoveCommand } from './commands/MoveCommand.js';
+import type { EditResult } from './commands/EditResult.js';
+import { CommandHistory } from './CommandHistory.js';
 
 export class EditorSession {
   #document: Document | undefined;
+  readonly #history = new CommandHistory<EditResult>();
 
   constructor(private readonly factory = new ShapeFactory()) {}
 
@@ -17,6 +21,7 @@ export class EditorSession {
   init(width = 800, height = 600): Document {
     const document = new Document(width, height);
     this.#document = document;
+    this.#history.resetAfterDocumentChange();
     return document;
   }
 
@@ -32,8 +37,22 @@ export class EditorSession {
       parent = target;
     }
     const shape = this.factory.create(type, id, geometry);
-    new CreateCommand(parent, shape).execute();
+    this.#history.execute(new CreateCommand(parent, shape));
     return shape;
+  }
+
+  move(id: string, dx: number, dy: number): EditResult {
+    return this.#history.execute(new MoveCommand(this.findById(id), dx, dy));
+  }
+
+  undo(): EditResult {
+    void this.document;
+    return this.#history.undo();
+  }
+
+  redo(): EditResult {
+    void this.document;
+    return this.#history.redo();
   }
 
   findById(id: string): Shape {

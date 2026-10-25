@@ -17,6 +17,10 @@ export class Circle extends Shape {
   get r(): number { return this.#r; }
   get fill(): string | undefined { return this.#fill; }
   override accept<T>(visitor: ShapeVisitor<T>): T { return visitor.circle(this); }
+  override savePosition(): () => void {
+    const cx = this.#cx; const cy = this.#cy;
+    return () => { this.#cx = cx; this.#cy = cy; };
+  }
   protected override prepareMove(dx: number, dy: number): () => void {
     const cx = this.#cx + dx; const cy = this.#cy + dy;
     if (![cx, cy].every(Number.isFinite)) throw new Error('resulting coordinates must be finite');

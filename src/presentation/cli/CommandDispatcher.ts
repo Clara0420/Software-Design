@@ -1,5 +1,6 @@
 import type { EditorSession } from '../../application/EditorSession.js';
 import { TreeFormatter } from '../formatters/TreeFormatter.js';
+import { EditResultFormatter } from '../formatters/EditResultFormatter.js';
 import { CommandParser, type Token } from './CommandParser.js';
 
 export class CommandDispatcher {
@@ -9,11 +10,15 @@ export class CommandDispatcher {
     private readonly session: EditorSession,
     private readonly parser = new CommandParser(),
     private readonly formatter = new TreeFormatter(),
+    private readonly editFormatter = new EditResultFormatter(),
   ) {
     this.#handlers = new Map([
       ['init', args => this.init(args.map(token => token.value))],
       ['create', args => this.create(args)],
       ['tree', args => this.tree(args.map(token => token.value))],
+      ['move', args => this.move(args.map(token => token.value))],
+      ['undo', args => this.undo(args)],
+      ['redo', args => this.redo(args)],
     ]);
   }
 
@@ -57,7 +62,28 @@ export class CommandDispatcher {
       values[spec.name] = spec.kind === 'number' ? this.parser.number(token.value) : token.value;
     });
     const shape = this.session.create(type, idToken.value, values, containerId);
-    return `${type}#${shape.id} created${containerId === undefined ? '' : ` in g#${containerId}`}`;
+    return this.editFormatter.format({ action: 'created', shape });
+  }
+
+  private move(args: string[]): string {
+    void this.session.document;
+    const [id, dx, dy] = args;
+    if (args.length !== 3 || id === undefined || dx === undefined || dy === undefined) {
+      throw new Error('usage: move <id> <dx> <dy>');
+    }
+    return this.editFormatter.format(this.session.move(id, this.parser.number(dx), this.parser.number(dy)));
+  }
+
+  private undo(args: Token[]): string {
+    void this.session.document;
+    if (args.length !== 0) throw new Error('usage: undo');
+    return this.editFormatter.format(this.session.undo());
+  }
+
+  private redo(args: Token[]): string {
+    void this.session.document;
+    if (args.length !== 0) throw new Error('usage: redo');
+    return this.editFormatter.format(this.session.redo());
   }
 
   private tree(args: string[]): string {

@@ -31,9 +31,9 @@ describe('CLI process', () => {
   });
 
   it('keeps processing after errors and rejects edits before initialization', () => {
-    const output = run('tree\ncreate rect r 0 0 1 1\nmove r 1 1\ninit\ncreate rect r 0 0 1 1\ntree\n');
+    const output = run('tree\ncreate rect r 0 0 1 1\nscale r 1\ninit\ncreate rect r 0 0 1 1\ntree\n');
     expect(output.match(/error: no document/g)).toHaveLength(2);
-    expect(output).toContain('error: unknown command: move');
+    expect(output).toContain('error: unknown command: scale');
     expect(output).toContain('└── rect#r  x=0 y=0 w=1 h=1');
   });
 
@@ -124,3 +124,49 @@ describe('CLI process', () => {
     expect(output).not.toContain('bad created');
     expect(output).toContain('svg (800x600)\n└── g#root\n    └── ellipse#good  cx=0 cy=0 rx=0 ry=0');
   });
+
+
+it('replays create/move/undo/redo in the real CLI', () => {
+  const output = run([
+    'init', 'undo', 'redo', 'create circle c1 100 100 20 red',
+    'move c1 30 0', 'tree c1', 'undo', 'tree c1', 'redo',
+    'undo', 'undo', 'tree', 'redo', 'redo', 'tree c1',
+  ].join('\n'));
+  expect(output.match(/error: undo not allowed after io command/g)).toHaveLength(2);
+  expect(output.match(/circle#c1 moved to \(130,100\)/g)).toHaveLength(3);
+  expect(output.match(/circle#c1 moved back to \(100,100\)/g)).toHaveLength(2);
+  expect(output).toContain('circle#c1 removed\nsvg (800x600)\ncircle#c1 created\ncircle#c1 moved to (130,100)');
+  expect(output).toContain('circle#c1  cx=100 cy=100 r=20 fill=red');
+});
+
+it('undoes nested group movement as a unit and preserves redo across failures', () => {
+  const output = run([
+    'init', 'create g outer', 'create g inner in outer',
+    'create rect r 0 0 10 20 in inner', 'create text t 5 6 "hi" in inner',
+    'move outer 10 20', 'undo', 'move missing 1 1', 'create g outer',
+    'redo', 'tree', 'undo', 'create circle c 1 2 3', 'redo', 'tree',
+  ].join('\n'));
+  expect(output).toContain('g#outer moved by (10,20)\ng#outer moved back by (-10,-20)');
+  expect(output).toContain('error: no such shape: missing');
+  expect(output).toContain('error: id already exists: outer');
+  expect(output).toContain('rect#r  x=10 y=20 w=10 h=20');
+  expect(output).toContain('text#t  (15,26) "hi"');
+  expect(output).toContain('error: nothing to redo');
+  expect(output).toContain('rect#r  x=0 y=0 w=10 h=20');
+});
+
+it('reports history/move syntax errors and does not revisit the old document after init', () => {
+  const output = run([
+    'move r 1 2', 'undo', 'redo', 'init', 'create rect old 0 0 1 1',
+    'move old 1', 'move old Infinity 0', 'undo extra', 'redo extra',
+    'undo', 'init', 'redo', 'create g fresh', 'undo', 'undo', 'redo', 'tree',
+  ].join('\n'));
+  expect(output.match(/error: no document/g)).toHaveLength(3);
+  expect(output).toContain('error: usage: move');
+  expect(output).toContain('error: invalid number: Infinity');
+  expect(output).toContain('error: usage: undo');
+  expect(output).toContain('error: usage: redo');
+  expect(output).toContain('error: undo not allowed after io command');
+  expect(output).toContain('error: nothing to undo');
+  expect(output.endsWith('svg (800x600)\n└── g#fresh\n')).toBe(true);
+});

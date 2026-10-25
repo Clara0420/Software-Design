@@ -193,3 +193,18 @@ ShapeFactory 集中保存每种类型的构造器与参数元数据（名称、�
 本轮修订了旧测试中“circle 尚不支持”的假设，改用 box 验证未知类型。新增元数据驱动的逐类型参数校验测试、混合 Group 移动与溢出原子性测试、逐类型根级/嵌套创建和错误状态保持测试，以及真实 CLI 的六类型嵌套树回放。没有新增依赖，没有实现 box、插件系统、其他 CLI 命令或 SVG I/O。
 
 验证：全工程类型检查通过，生产构建通过；Vitest 5 个测试文件、49 项测试全部通过。按名字分派继续集中于 CommandDispatcher 和 ShapeFactory，仍为既有架构记录中的待重构点。未执行 Git Commit/Push/Tag。
+
+### move 与撤销重做（2026-10-25）
+
+当前新增 `move <id> <dx> <dy>`、`undo`、`redo`；此前六种类型的 create 均进入历史并支持撤销重做。tree 等查询不进入历史。每次成功的 create 或 move 占一个撤销单元；空 Group 或零位移的成功 move 也按一条编辑处理。
+
+- `application/CommandHistory` 统一调度 Command.execute/undo。execute、undo、redo 均先调用命令，成功后才改变栈；失败不弹出或新增记录，也不清空 redo。undo 后下一条成功编辑清空 redo；失败编辑和查询保留 redo。
+- `application/commands/MoveCommand` 保存目标图形、位移和恢复函数。几何修改继续由 Shape.move 多态完成，Group 递归到所有子孙；整组只记录一个 MoveCommand。原有预验证保证任何后代坐标溢出时全组不变。
+- `Shape.savePosition` 提供不暴露可写字段的坐标快照恢复函数，各具体图形保存自己的坐标，Group 组合后代恢复函数。采用原值恢复，避免 `x + dx - dx` 的浮点精度丢失。快照仅保存在命令中，不维护第二棵当前文档树；redo 在精确恢复后重新执行相同位移。
+- `CreateCommand` 继续保存原父容器和原图形实例；撤销移除该实例，重做再次挂载。当前只有追加式 create 和 move，在正常 LIFO 历史流程下同级顺序得以恢复；未提前实现重排或删除命令。
+- `EditorSession` 持有私有历史对象。成功 init 清除旧文档的 undo/redo，并设置需求规定的禁用状态；之后 undo/redo 均报 `undo not allowed after io command`，直到下一条编辑成功。失败 init 保留原文档及原历史。新文档不会通过撤销重新访问旧文档。
+- `Command<Result>` 的泛型返回值用于传递结构化 EditResult；Application 不生成终端反馈。Presentation 新增 EditResultFormatter，以 ShapeVisitor 格式化移动后的坐标、组位移及创建/撤销创建反馈，不增加类型名分支。
+
+本轮实现前识别并处理了反向位移无法精确恢复浮点数的问题；测试包括 0.1 + 0.2 和大位移抹去小坐标的情况。旧 CLI 测试中“move 是未知命令”改用尚未实现的 scale。新增历史顺序、失败 execute/undo/redo 保持栈、六类 create/move 撤销重做、嵌套混合组单步撤销、溢出失败、redo 分支清理、init 禁用与旧历史隔离、根级及子级创建顺序恢复测试，以及真实 CLI 会话回放。
+
+验证：全工程 TypeScript 检查、生产构建通过；Vitest 6 个文件、70 项测试全部通过。本轮未实现 read/save/canvas，因此没有预先决定这些操作之后旧历史的保留策略；后续实现时按需求增加相应历史限制。仍未实现其他编辑命令、SVG I/O、box 或插件。未新增依赖，未执行 Git Commit/Push/Tag。

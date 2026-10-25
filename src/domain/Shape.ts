@@ -18,6 +18,9 @@ export abstract class Shape {
 
   abstract accept<T>(visitor: ShapeVisitor<T>): T;
 
+  /** Opaque position memento; restoring never exposes mutable geometry fields. */
+  abstract savePosition(): () => void;
+
   move(dx: number, dy: number): void {
     if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
       throw new Error('movement must be finite');

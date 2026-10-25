@@ -1,4 +1,4 @@
-export interface Command {
-  execute(): void;
-  undo(): void;
+export interface Command<Result = void> {
+  execute(): Result;
+  undo(): Result;
 }

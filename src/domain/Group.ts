@@ -9,6 +9,11 @@ export class Group extends Shape {
 
   override accept<T>(visitor: ShapeVisitor<T>): T { return visitor.group(this); }
 
+  override savePosition(): () => void {
+    const restores = this.children.map(child => child.savePosition());
+    return () => { for (const restore of restores) restore(); };
+  }
+
   override get children(): readonly Shape[] { return this.#shapes.children; }
   add(shape: Shape): void { this.#shapes.add(shape); }
   remove(shape: Shape): void { this.#shapes.remove(shape); }

@@ -19,6 +19,10 @@ export class Ellipse extends Shape {
   get ry(): number { return this.#ry; }
   get fill(): string | undefined { return this.#fill; }
   override accept<T>(visitor: ShapeVisitor<T>): T { return visitor.ellipse(this); }
+  override savePosition(): () => void {
+    const cx = this.#cx; const cy = this.#cy;
+    return () => { this.#cx = cx; this.#cy = cy; };
+  }
   protected override prepareMove(dx: number, dy: number): () => void {
     const cx = this.#cx + dx; const cy = this.#cy + dy;
     if (![cx, cy].every(Number.isFinite)) throw new Error('resulting coordinates must be finite');

@@ -28,6 +28,11 @@ export class Rectangle extends Shape {
 
   override accept<T>(visitor: ShapeVisitor<T>): T { return visitor.rectangle(this); }
 
+  override savePosition(): () => void {
+    const x = this.#x; const y = this.#y;
+    return () => { this.#x = x; this.#y = y; };
+  }
+
   protected override prepareMove(dx: number, dy: number): () => void {
     const x = this.#x + dx;
     const y = this.#y + dy;
