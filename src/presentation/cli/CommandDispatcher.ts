@@ -1,9 +1,9 @@
 import type { EditorSession } from '../../application/EditorSession.js';
 import { TreeFormatter } from '../formatters/TreeFormatter.js';
-import { CommandParser } from './CommandParser.js';
+import { CommandParser, type Token } from './CommandParser.js';
 
 export class CommandDispatcher {
-  readonly #handlers: ReadonlyMap<string, (args: string[]) => string>;
+  readonly #handlers: ReadonlyMap<string, (args: Token[]) => string>;
 
   constructor(
     private readonly session: EditorSession,
@@ -11,17 +11,17 @@ export class CommandDispatcher {
     private readonly formatter = new TreeFormatter(),
   ) {
     this.#handlers = new Map([
-      ['init', args => this.init(args)],
+      ['init', args => this.init(args.map(token => token.value))],
       ['create', args => this.create(args)],
-      ['tree', args => this.tree(args)],
+      ['tree', args => this.tree(args.map(token => token.value))],
     ]);
   }
 
   dispatch(line: string): string | undefined {
-    const [name, ...args] = this.parser.parse(line);
+    const [name, ...args] = this.parser.tokenize(line);
     if (name === undefined) return undefined;
-    const handler = this.#handlers.get(name);
-    if (!handler) throw new Error(`unknown command: ${name}`);
+    const handler = this.#handlers.get(name.value);
+    if (!handler) throw new Error(`unknown command: ${name.value}`);
     return handler(args);
   }
 
@@ -33,27 +33,31 @@ export class CommandDispatcher {
     return `canvas ${document.width}x${document.height} created`;
   }
 
-  private create(args: string[]): string {
+  private create(args: Token[]): string {
     // Session readiness precedes argument errors for editing commands.
     void this.session.document;
-    const parameters = [...args];
+    const [typeToken, idToken, ...parameters] = args;
+    if (!typeToken || !idToken) throw new Error('usage: create <type> <id> [params] [in <containerId>]');
+    const type = typeToken.value;
+    const specs = this.session.parametersFor(type);
+    const required = specs.filter(spec => !spec.optional).length;
     let containerId: string | undefined;
-    if (parameters.length >= 8 && parameters.at(-2) === 'in') {
-      containerId = parameters.pop();
-      parameters.pop();
+    const clause = parameters.findIndex((token, index) => index >= required && token.value === 'in' && !token.quoted);
+    if (clause !== -1) {
+      if (clause !== parameters.length - 2) throw new Error('usage: in <containerId>');
+      containerId = parameters[clause + 1]!.value;
+      parameters.splice(clause);
     }
-    const [type, id, x, y, width, height, fill] = parameters;
-    if (parameters.length < 6 || parameters.length > 7
-      || type === undefined || id === undefined || x === undefined || y === undefined
-      || width === undefined || height === undefined) {
-      throw new Error('usage: create rect <id> <x> <y> <w> <h> [fill] [in <containerId>]');
+    if (parameters.length < required || parameters.length > specs.length) {
+      throw new Error(`usage: create ${type} <id> ${specs.map(spec => spec.optional ? `[${spec.name}]` : `<${spec.name}>`).join(' ')} [in <containerId>]`);
     }
-    const shape = this.session.create(type, id, {
-      x: this.parser.number(x), y: this.parser.number(y),
-      width: this.parser.number(width), height: this.parser.number(height),
-      ...(fill === undefined ? {} : { fill }),
-    }, containerId);
-    return `rect#${shape.id} created${containerId === undefined ? '' : ` in g#${containerId}`}`;
+    const values: Record<string, number | string> = {};
+    parameters.forEach((token, index) => {
+      const spec = specs[index]!;
+      values[spec.name] = spec.kind === 'number' ? this.parser.number(token.value) : token.value;
+    });
+    const shape = this.session.create(type, idToken.value, values, containerId);
+    return `${type}#${shape.id} created${containerId === undefined ? '' : ` in g#${containerId}`}`;
   }
 
   private tree(args: string[]): string {

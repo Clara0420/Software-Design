@@ -1,7 +1,7 @@
 import { Document } from '../domain/Document.js';
 import { Group } from '../domain/Group.js';
 import type { Shape } from '../domain/Shape.js';
-import { ShapeFactory, type RectangleGeometry } from '../domain/ShapeFactory.js';
+import { ShapeFactory, type ShapeParameters, type ParameterSpec } from '../domain/ShapeFactory.js';
 import { CreateCommand } from './commands/CreateCommand.js';
 
 export class EditorSession {
@@ -20,7 +20,9 @@ export class EditorSession {
     return document;
   }
 
-  create(type: string, id: string, geometry: RectangleGeometry, containerId?: string): Shape {
+  parametersFor(type: string): readonly ParameterSpec[] { return this.factory.parametersFor(type); }
+
+  create(type: string, id: string, geometry: ShapeParameters, containerId?: string): Shape {
     const document = this.document;
     let parent: Document | Group = document;
     if (containerId !== undefined) {

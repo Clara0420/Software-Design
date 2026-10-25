@@ -13,7 +13,7 @@ const run = (input: string) => {
 
 describe('CLI process', () => {
   it('exits on EOF, including empty input', () => {
-    expect(run('')).toContain('supported commands: init, create rect, tree');
+    expect(run('')).toContain('supported commands: init, create (rect/circle/ellipse/line/text/g), tree');
   });
 
   it('runs init → create rect → tree with ordered roots, floats and optional fill', () => {
@@ -52,11 +52,11 @@ describe('CLI process', () => {
 
   it('rejects unsupported types, missing shapes/containers and non-container targets', () => {
     const output = run([
-      'init', 'create rect r 0 0 1 1', 'create circle c 0 0 1 1',
+      'init', 'create rect r 0 0 1 1', 'create box c 0 0 1 1',
       'tree missing', 'create rect a 0 0 1 1 in missing',
       'create rect b 0 0 1 1 in r', 'tree',
     ].join('\n'));
-    expect(output).toContain('error: unknown shape type: circle');
+    expect(output).toContain('error: unknown shape type: box');
     expect(output).toContain('error: no such shape: missing');
     expect(output).toContain('error: no such container: missing');
     expect(output).toContain('error: not a container: r');
@@ -76,3 +76,51 @@ describe('CLI process', () => {
     expect(output).toContain('canvas 500x600 created\nsvg (500x600)\nerror: no such shape: old');
   });
 });
+
+
+  it('creates all six types in nested groups with quoted text and optional styles', () => {
+    const output = run([
+      'init 800 600', 'create g scene', 'create g node in scene',
+      'create rect r 1 2 30 40 #eee in node',
+      'create circle c 5.5 -6 7 red in node',
+      'create ellipse e 8 9 10 11 in node',
+      'create line l -1 -2 3 4 blue in scene',
+      'create text t 12 13 "开始 in node #标题" in node',
+      'create text empty 0 0 ""', 'tree',
+    ].join('\n'));
+    expect(output).not.toContain('error:');
+    for (const type of ['g#node', 'rect#r', 'circle#c', 'ellipse#e', 'line#l', 'text#t']) {
+      expect(output).toContain(`${type} created in g#`);
+    }
+    expect(output).toContain('svg (800x600)\n├── g#scene\n│   ├── g#node\n│   │   ├── rect#r  x=1 y=2 w=30 h=40 fill=#eee\n│   │   ├── circle#c  cx=5.5 cy=-6 r=7 fill=red\n│   │   ├── ellipse#e  cx=8 cy=9 rx=10 ry=11\n│   │   └── text#t  (12,13) "开始 in node #标题"\n│   └── line#l  (-1,-2) -> (3,4) stroke=blue\n└── text#empty  (0,0) ""');
+  });
+
+  it('checks cross-type IDs and container targets for newly supported types', () => {
+    const output = run([
+      'init', 'create g root', 'create circle c 1 2 3 in root',
+      'create text c 0 0 "duplicate"', 'create g c', 'create g root in root',
+      'create ellipse e 0 0 1 2 in missing', 'create line l 0 0 1 1 in c',
+      'create text t 0 0 "in" in root', 'create circle C 0 0 0', 'tree',
+    ].join('\n'));
+    expect(output.match(/^error:/gm)).toHaveLength(5);
+    expect(output.match(/id already exists: c/g)).toHaveLength(2);
+    expect(output).toContain('id already exists: root');
+    expect(output).toContain('no such container: missing');
+    expect(output).toContain('not a container: c');
+    expect(output).toContain('text#t  (0,0) "in"');
+    expect(output).toContain('circle#C  cx=0 cy=0 r=0');
+  });
+
+  it('rejects malformed new-type commands without poisoning subsequent commands', () => {
+    const output = run([
+      'init', 'create g root', 'create g bad extra', 'create circle bad 1 2',
+      'create circle bad 1 2 -3', 'create ellipse bad 0 0 1 -2',
+      'create line bad 0 0 Infinity 2', 'create text bad 0 0 unquoted words',
+      'create text bad 0 0 "unterminated', 'create g bad in',
+      'create circle bad 0 0 1 in root extra', 'create text "" 0 0 "x"',
+      'create ellipse good 0 0 0 0 in root', 'tree',
+    ].join('\n'));
+    expect(output.match(/^error:/gm)).toHaveLength(10);
+    expect(output).not.toContain('bad created');
+    expect(output).toContain('svg (800x600)\n└── g#root\n    └── ellipse#good  cx=0 cy=0 rx=0 ry=0');
+  });
