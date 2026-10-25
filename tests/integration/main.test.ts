@@ -1,4 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -13,7 +16,7 @@ const run = (input: string) => {
 
 describe('CLI process', () => {
   it('exits on EOF, including empty input', () => {
-    expect(run('')).toContain('supported commands: init, create (rect/circle/ellipse/line/text/g), tree');
+    expect(run('')).toContain('supported commands: init, read, save, canvas, create (rect/circle/ellipse/line/text/g), tree');
   });
 
   it('runs init → create rect → tree with ordered roots, floats and optional fill', () => {
@@ -270,4 +273,80 @@ it('reports delete/front/back errors without consuming redo', () => {
   expect(output).toContain('rect#r deleted');
   expect(output).toContain('error: nothing to redo');
   expect(output.endsWith('svg (800x600)\n')).toBe(true);
+});
+
+it('saves and reads a six-shape nested document through real files', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'svg-cli-roundtrip '));
+  const path = join(directory, '图 形.svg');
+  try {
+    const output = run([
+      'init 400 300', 'create g scene', 'create rect r 1 2 3 4 #eee in scene',
+      'create circle c 5 6 7 red in scene', 'create ellipse e 8 9 10 11 in scene',
+      'create line l 1 2 3 4 blue in scene', 'create text t 12 13 "A & B < 中文" in scene',
+      'set scene stroke black', 'set r stroke-width 1.5', `save "${path}"`,
+      'move scene 100 100', `read "${path}"`, 'tree', 'save',
+    ].join('\n'));
+    expect(output).not.toContain('error:');
+    expect(output).toContain(`saved to ${path} (6 elements)`);
+    expect(output).toContain(`read ${path} (6 elements)`);
+    expect(output).toContain('svg (400x300)\n└── g#scene stroke=black');
+    expect(output).toContain('rect#r  x=1 y=2 w=3 h=4 fill=#eee stroke=black stroke-width=1.5');
+    expect(output).toContain('circle#c  cx=5 cy=6 r=7 fill=red stroke=black');
+    expect(output).toContain('ellipse#e  cx=8 cy=9 rx=10 ry=11 stroke=black');
+    expect(output).toContain('line#l  (1,2) -> (3,4) stroke=black');
+    expect(output).toContain('text#t  (12,13) "A & B < 中文" stroke=black');
+    const saved = readFileSync(path, 'utf8');
+    expect(saved).toContain('<text id="t" stroke="black" x="12" y="13">A &amp; B &lt; 中文</text>');
+    expect(saved).toContain('viewBox="0 0 400 300"');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+it('assigns missing IDs on read and persists them on save', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'svg-cli-ids-'));
+  const input = join(directory, 'input.svg');
+  const outputPath = join(directory, 'output.svg');
+  try {
+    writeFileSync(input, '<svg width="20" height="10"><rect id="rect1" x="0" y="0" width="1" height="1"/><g><rect x="1" y="2" width="3" height="4"/></g></svg>', 'utf8');
+    const output = run([`read "${input}"`, 'tree', `save "${outputPath}"`].join('\n'));
+    expect(output).toContain('warning: assigned id g1 to unnamed <g>');
+    expect(output).toContain('warning: assigned id rect2 to unnamed <rect>');
+    expect(output).toContain(`read ${input} (3 elements)`);
+    expect(output).toContain('g#g1\n    └── rect#rect2');
+    const saved = readFileSync(outputPath, 'utf8');
+    expect(saved).toContain('<g id="g1">');
+    expect(saved).toContain('id="rect2"');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+it('reports file errors, preserves state on failure and enforces every successful I/O barrier', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'svg-cli-errors-'));
+  const missing = join(directory, 'missing.svg');
+  const valid = join(directory, 'valid.svg');
+  const saved = join(directory, 'saved.svg');
+  try {
+    writeFileSync(valid, '<svg width="30" height="40"><circle id="loaded" cx="1" cy="2" r="3"/></svg>', 'utf8');
+    const output = run([
+      'init', 'create rect old 0 0 1 1', `read "${missing}"`, 'undo', 'redo',
+      `save "${directory}"`, 'undo', `save "${saved}"`, 'undo', 'redo',
+      'create g edit', 'undo', 'canvas', 'redo', 'canvas -1 20', 'undo',
+      'canvas 500 250', 'undo', 'create circle fresh 0 0 1', 'undo', 'undo',
+      `read "${valid}"`, 'undo', 'tree',
+    ].join('\n'));
+    expect(output).toContain(`error: cannot read file: ${missing}`);
+    expect(output).toContain('rect#old removed');
+    expect(output).toContain('rect#old created');
+    expect(output).toContain(`error: cannot write file: ${directory}`);
+    expect(output.match(/error: undo not allowed after io command/g)).toHaveLength(4);
+    expect(output).toContain('canvas 800x600');
+    expect(output).toContain('error: canvas dimensions must be finite and positive');
+    expect(output).toContain('canvas resized to 500x250');
+    expect(output).toContain('error: nothing to undo');
+    expect(output.endsWith('svg (30x40)\n└── circle#loaded  cx=1 cy=2 r=3\n')).toBe(true);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

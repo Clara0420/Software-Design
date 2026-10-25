@@ -254,3 +254,23 @@ Document 新增 planDelete 和 planReorder，负责成员校验并生成 TreeCha
 测试覆盖叶子和多层 Group 删除、整棵子树 ID 消失与恢复、对象身份及原父节点/原索引恢复、根级与嵌套同级重排、子树内部顺序保持、边缘及唯一节点操作、失败保留 redo、成功编辑清空 redo、命令状态保护，以及 delete/front/back 与 group/move 等命令的混合历史。真实 CLI 回放验证成功反馈、错误反馈和最终 tree 顺序。
 
 验证：全工程 TypeScript 检查、生产构建通过；Vitest 11 个文件、123 项测试全部通过。未新增依赖，未实现 SVG I/O、box 或插件，未执行 Git Commit/Push/Tag。
+
+### read / save / canvas 与 SVG round-trip（2026-10-25）
+
+本轮通过 Application port 与 Infrastructure 实现文档 I/O。`application/ports/DocumentRepository` 定义 read/write 能力和读取结果；EditorSession 只依赖该接口。`infrastructure/SvgFileRepository` 使用 Node 文件系统实现 port，并组合 SvgParser、SvgSerializer。main.ts 作为 composition root 注入具体仓储。Domain 和 Presentation 均不依赖 Infrastructure，依赖方向保持为 Presentation → Application → Domain、Infrastructure → Application port/Domain。
+
+支持 `read <file.svg>`、`save [file.svg]` 和 `canvas [w] [h]`。read 成功后替换当前文档并记住源路径；显式 save 成功后也记住目标路径，后续无参数 save 复用该路径。init 清除路径，因此没有已知路径时无参数 save 报 `no file path. use save <file.svg> first`。相对路径按进程工作目录解析，带空格或 Unicode 的路径通过 CLI 双引号传入。文件不存在、不可解析统一报 `cannot read file: <path>`；目录目标或其他写入失败统一报 `cannot write file: <path>`。失败不会替换文档、修改路径或改变历史。
+
+canvas 无参数只显示当前尺寸，不进入历史也不设置屏障；修改尺寸要求同时提供有限正数 width/height，成功后输出新尺寸并设置 I/O 屏障。非法尺寸保持画布和历史不变。
+
+SvgParser 是无第三方依赖的受限 XML/SVG 解析器，支持 XML 声明、注释、CDATA、标准/数值实体、单/双引号属性、命名空间前缀，以及 rect/circle/ellipse/line/text/g 的任意嵌套 Group。读取 width/height、全部几何字段、文本内容和 fill/stroke/stroke-width；Document/Shape 构造与 add 继续负责尺寸、ID 唯一、单父容器和无环验证。ShapeFactory 新增 hydrate，将显式公共样式写入当前节点自身，不触发 Group 编辑命令的递归传播语义。
+
+缺失 ID 按元素类型分别生成 `<tag><序号>`，先扫描全部显式 ID，确保生成值不会与文件中稍后出现的 ID 冲突；警告按文档遍历顺序输出，例如 `warning: assigned id rect1 to unnamed <rect>`。重复或空 ID 导致读取失败。元素计数包含所有图形和 Group，不包含 svg 根。
+
+SvgSerializer 通过 ShapeVisitor 多态输出六种元素，递归保持 children 顺序，转义 ID、样式和文本，输出 width/height/viewBox 与 UTF-8 XML 声明。save→read→save 会得到稳定的规范化 SVG，并保持当前模型的画布、树、几何、文本和显式公共样式。未支持的 SVG 元素、DOCTYPE、畸形 XML 和缺失/非法必需几何属性会拒绝读取。本阶段不建模 transform、CSS、任意 SVG 扩展属性；这些属性不会参与模型 round-trip，新增支持需在后续需求中明确语义。
+
+init、成功 read、成功 save、成功 canvas 修改都会清空既有 undo/redo 并设置 `undo not allowed after io command` 屏障。屏障持续到下一条成功编辑命令；失败编辑不解除屏障。下一条成功编辑建立新的历史分支，撤销完该分支后返回 `nothing to undo`，不会越过 I/O 边界访问旧文档状态。
+
+测试新增 Infrastructure 解析/序列化与真实文件仓储测试、Application port/路径/屏障测试，以及真实 CLI 文件 round-trip。覆盖六种图形、嵌套和空 Group、全部公共样式、XML 实体与中文、缺失 ID 及冲突避让、递归计数、Unicode/空格路径、读取/写入/解析错误、无参数 save 路径复用、失败原子性、canvas 查询与修改、四类 I/O 屏障和 save→read→save 稳定性。
+
+验证：全工程 TypeScript 检查、生产构建通过；Vitest 13 个文件、150 项测试全部通过。未新增依赖，未实现 box、插件、CSS 或通用 SVG transform，未执行 Git Commit/Push/Tag。

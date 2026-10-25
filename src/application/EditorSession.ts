@@ -13,12 +13,20 @@ import { DeleteCommand } from './commands/DeleteCommand.js';
 import { ReorderCommand } from './commands/ReorderCommand.js';
 import type { EditResult } from './commands/EditResult.js';
 import { CommandHistory } from './CommandHistory.js';
+import type { DocumentRepository, LoadedDocument } from './ports/DocumentRepository.js';
+
+export interface ReadResult extends LoadedDocument { readonly path: string; }
+export interface SaveResult { readonly path: string; readonly elementCount: number; }
 
 export class EditorSession {
   #document: Document | undefined;
+  #path: string | undefined;
   readonly #history = new CommandHistory<EditResult>();
 
-  constructor(private readonly factory = new ShapeFactory()) {}
+  constructor(
+    private readonly factory = new ShapeFactory(),
+    private readonly repository?: DocumentRepository,
+  ) {}
 
   get document(): Document {
     if (!this.#document) throw new Error("no document. use 'init' or 'read' first");
@@ -28,6 +36,33 @@ export class EditorSession {
   init(width = 800, height = 600): Document {
     const document = new Document(width, height);
     this.#document = document;
+    this.#path = undefined;
+    this.#history.resetAfterDocumentChange();
+    return document;
+  }
+
+  read(path: string): ReadResult {
+    const loaded = this.requireRepository().read(path);
+    this.#document = loaded.document;
+    this.#path = path;
+    this.#history.resetAfterDocumentChange();
+    return { ...loaded, path };
+  }
+
+  save(path?: string): SaveResult {
+    const target = path ?? this.#path;
+    if (target === undefined) throw new Error('no file path. use save <file.svg> first');
+    const elementCount = this.requireRepository().write(target, this.document);
+    this.#path = target;
+    this.#history.resetAfterDocumentChange();
+    return { path: target, elementCount };
+  }
+
+  resizeCanvas(width: number, height: number): Document {
+    const document = this.document;
+    // Validate on a temporary document so failure leaves both canvas and history untouched.
+    void new Document(width, height);
+    document.resize(width, height);
     this.#history.resetAfterDocumentChange();
     return document;
   }
@@ -109,5 +144,10 @@ export class EditorSession {
     const shape = this.document.findById(id);
     if (!shape) throw new Error(`no such shape: ${id}`);
     return shape;
+  }
+
+  private requireRepository(): DocumentRepository {
+    if (!this.repository) throw new Error('document repository is not configured');
+    return this.repository;
   }
 }

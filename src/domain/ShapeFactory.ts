@@ -7,6 +7,11 @@ import { Group } from './Group.js';
 import type { Shape } from './Shape.js';
 
 export type ShapeParameters = Readonly<Record<string, number | string>>;
+export interface ShapeStyles {
+  readonly fill?: string;
+  readonly stroke?: string;
+  readonly strokeWidth?: number;
+}
 export interface ParameterSpec {
   readonly name: string;
   readonly kind: 'number' | 'string';
@@ -57,6 +62,14 @@ export class ShapeFactory {
       }
     }
     return definition.build(id, parameters);
+  }
+
+  hydrate(type: string, id: string, parameters: ShapeParameters, styles: ShapeStyles): Shape {
+    const shape = this.create(type, id, parameters);
+    if (styles.fill !== undefined) shape.setOwnAttribute('fill', styles.fill);
+    if (styles.stroke !== undefined) shape.setOwnAttribute('stroke', styles.stroke);
+    if (styles.strokeWidth !== undefined) shape.setOwnAttribute('stroke-width', styles.strokeWidth);
+    return shape;
   }
 
   private definition(type: string): Definition {

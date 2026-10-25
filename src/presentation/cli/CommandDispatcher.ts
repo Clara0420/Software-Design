@@ -14,6 +14,9 @@ export class CommandDispatcher {
   ) {
     this.#handlers = new Map([
       ['init', args => this.init(args.map(token => token.value))],
+      ['read', args => this.read(args.map(token => token.value))],
+      ['save', args => this.save(args.map(token => token.value))],
+      ['canvas', args => this.canvas(args.map(token => token.value))],
       ['create', args => this.create(args)],
       ['tree', args => this.tree(args.map(token => token.value))],
       ['move', args => this.move(args.map(token => token.value))],
@@ -44,6 +47,29 @@ export class CommandDispatcher {
     const height = args[1] === undefined ? 600 : this.parser.number(args[1]);
     const document = this.session.init(width, height);
     return `canvas ${document.width}x${document.height} created`;
+  }
+
+  private read(args: string[]): string {
+    if (args.length !== 1 || args[0] === undefined) throw new Error('usage: read <file.svg>');
+    const result = this.session.read(args[0]);
+    return [...result.warnings, `read ${result.path} (${result.elementCount} elements)`].join('\n');
+  }
+
+  private save(args: string[]): string {
+    void this.session.document;
+    if (args.length > 1) throw new Error('usage: save [file.svg]');
+    const result = this.session.save(args[0]);
+    return `saved to ${result.path} (${result.elementCount} elements)`;
+  }
+
+  private canvas(args: string[]): string {
+    const document = this.session.document;
+    if (args.length === 0) return `canvas ${document.width}x${document.height}`;
+    if (args.length !== 2 || args[0] === undefined || args[1] === undefined) {
+      throw new Error('usage: canvas [w] [h]');
+    }
+    const resized = this.session.resizeCanvas(this.parser.number(args[0]), this.parser.number(args[1]));
+    return `canvas resized to ${resized.width}x${resized.height}`;
   }
 
   private create(args: Token[]): string {

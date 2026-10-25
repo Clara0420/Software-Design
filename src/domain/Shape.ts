@@ -51,6 +51,13 @@ export abstract class Shape {
 
   set(attribute: string, value: number | string): void { this.prepareSet(attribute, value)(); }
 
+  /** Used by trusted model construction to restore an explicitly stored value without Composite propagation. */
+  setOwnAttribute(attribute: 'fill' | 'stroke' | 'stroke-width', value: number | string): void {
+    const binding = Shape.prototype.attributes.call(this).get(attribute);
+    if (!binding) throw new Error(`unknown attribute: ${attribute}`);
+    binding.prepare(value)();
+  }
+
   scale(factor: number): void {
     if (!Number.isFinite(factor) || factor <= 0) throw new Error('scale factor must be positive');
     this.prepareScale(factor)();
