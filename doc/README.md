@@ -2,7 +2,7 @@
 
 ## 当前阶段与运行方式
 
-权威需求见 [phase_cli_1.md](../requirements/phase_cli_1.md)，开发约束见 [AGENTS.md](../AGENTS.md)。本轮只建立工程基础设施与初步架构，不实现 SVG 编辑业务。下文的类与接口均为设计计划，除 main.ts 外尚未生成实现。
+权威需求见 [phase_cli_1.md](../requirements/phase_cli_1.md)，开发约束见 [AGENTS.md](../AGENTS.md)。当前已实现最小 Domain 模型及 `init → create rect → tree` CLI 功能链。本文原始架构方案与早期记录保留为历史背景；当前实现范围、命名调整及验证结果见文末最新记录。
 
 使用 Node.js 24.x 和 npm。首次安装执行 `npm ci`（依赖锁定后）；开发命令：
 
@@ -12,7 +12,7 @@
 | `npm run typecheck` | 检查源码、测试和 Vitest 配置，不输出文件 |
 | `npm test` | 自动先类型检查、构建，再执行 Vitest 测试 |
 | `npm run test:watch` | Vitest 监听模式；当前入口测试读取构建产物，修改入口后需先重新 build |
-| `npm run cli` | 自动构建后运行最小入口，显示工程状态后退出 |
+| `npm run cli` | 自动构建后进入 REPL；终端使用 `svg> ` 提示符，输入 EOF 结束；支持管道脚本 |
 
 采用原生 ESM 与 NodeNext 模块解析，相对模块导入使用运行时的 .js 扩展名。启用 strict、索引访问检查、精确可选属性、显式 override 和未使用代码检查。基础配置检查测试，独立构建配置只输出 src，避免把测试发布到 dist。仅引入 TypeScript、Node 类型声明和 Vitest 作为开发依赖，无业务运行时依赖。
 
@@ -160,3 +160,18 @@ Shape 定义图形统一行为，叶子图形实现自身几何变化，Group �
 - `npm test`：通过，包含全工程类型检查、构建及 1 个进程启动集成测试（1/1）。
 - `npm run cli`：通过，打印工程初始化提示后正常退出；没有进入 REPL 或执行编辑命令。
 - 环境待办：`git status` 返回 `this operation must be run in a work tree`，尚需排查已有仓库配置。本轮未修改 Git 配置，也未执行 Commit、Push、Tag。
+
+### CLI 最小功能链记录（2026-10-25）
+
+本轮实现 `init [w] [h]`、`create rect <id> <x> <y> <w> <h> [fill] [in <containerId>]`、`tree [id]`。REPL 支持逐行处理、空行、整行注释、双引号参数、错误后继续执行及 EOF 退出。交互终端显示 `svg> `，管道输入不输出提示符。`init 500` 按两个独立可选参数解释为 500×600；矩形允许零尺寸，画布尺寸必须为有限正数。颜色保存为原字符串，未提供 fill 时不补写默认值。
+
+- Presentation：`cli/REPL` 管理输入输出，`CommandParser` 负责分词与完整数值校验，`CommandDispatcher` 集中分派三个命令；`formatters/TreeFormatter` 读取模型输出树。
+- Application：`EditorSession` 持有唯一当前 Document；`commands/Command` 定义 execute/undo，`CreateCommand` 保存图形和目标容器，执行添加并可撤销及再次执行。当前没有历史管理器，也没有开放 undo/redo CLI。
+- Domain：沿用实际类名 Document（未引入 DOM 类型）及平铺文件结构；ShapeFactory 是唯一类型名分派位置，本轮仅支持 rect。Rectangle 增加只读可选 fill；ShapeVisitor/accept 让格式化读取 Rectangle、Group，而不复制类型名分派。新增类型时需扩展访问接口，这是当前封闭类型集合的明确取舍。
+- Infrastructure：本轮没有实现；main.ts 仅组装会话、分发器和 REPL。不存在文件读写依赖。
+
+按名字分派仍仅位于 CommandDispatcher、ShapeFactory，保留为待重构点。Presentation 不直接改模型；Application 调用 Domain；Domain 不依赖外层。Document 和 Group 继续复用 ShapeCollection 的结构约束。`in` 可定位已存在的 Group，本轮 CLI 尚不能创建 Group；对应成功路径由应用集成测试构建已有模型验证。
+
+实际修订与检查：将旧脚手架入口测试替换为真实子进程会话回放；为避免格式化层新增类型分支，采用访问接口；创建命令只在添加成功后更新执行状态，初始化只在新文档构造成功后替换当前文档。错误路径覆盖重复 ID、非法尺寸、无文档、无容器、非容器、未知命令、未知类型和语法错误。
+
+验证：全工程 TypeScript 检查通过，生产构建通过，Vitest 共 4 个文件、26 项测试通过（包含原有 13 项 Domain 测试及 7 项真实 CLI 进程测试）。没有实现其他编辑命令、历史管理、SVG I/O、其他图形类型或插件，也没有执行 Git Commit/Push/Tag。

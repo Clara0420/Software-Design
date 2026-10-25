@@ -1,6 +1,7 @@
 import { ShapeCollection } from './ShapeCollection.js';
 import type { Document } from './Document.js';
 import type { Group } from './Group.js';
+import type { ShapeVisitor } from './ShapeVisitor.js';
 
 /** Common component: identity, read-only structure and polymorphic movement. */
 export abstract class Shape {
@@ -14,6 +15,8 @@ export abstract class Shape {
   get id(): string { return this.#id; }
   get parent(): Group | Document | undefined { return ShapeCollection.parentOf(this); }
   get children(): readonly Shape[] { return Object.freeze([]); }
+
+  abstract accept<T>(visitor: ShapeVisitor<T>): T;
 
   move(dx: number, dy: number): void {
     if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
