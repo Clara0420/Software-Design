@@ -9,4 +9,12 @@ export type EditResult = {
   readonly shape: Shape;
   readonly dx: number;
   readonly dy: number;
+} | {
+  readonly action: 'updated' | 'updated back';
+  readonly shape: Shape;
+  readonly attribute: string;
+} | {
+  readonly action: 'scaled' | 'scaled back';
+  readonly shape: Shape;
+  readonly factor: number;
 };

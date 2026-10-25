@@ -14,6 +14,22 @@ export class Group extends Shape {
     return () => { for (const restore of restores) restore(); };
   }
 
+  protected override saveGeometry(): () => void {
+    const restores = this.children.map(child => child.saveState());
+    return () => { for (const restore of restores) restore(); };
+  }
+
+  protected override prepareScale(factor: number): () => void {
+    const scales = this.children.map(child => Shape.prepareChildScale(child, factor));
+    return () => { for (const scale of scales) scale(); };
+  }
+
+  protected override prepareSet(attribute: string, value: number | string): () => void {
+    const own = super.prepareSet(attribute, value);
+    const sets = this.children.map(child => Shape.prepareChildSet(child, attribute, value));
+    return () => { own(); for (const set of sets) set(); };
+  }
+
   override get children(): readonly Shape[] { return this.#shapes.children; }
   add(shape: Shape): void { this.#shapes.add(shape); }
   remove(shape: Shape): void { this.#shapes.remove(shape); }

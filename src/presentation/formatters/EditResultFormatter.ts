@@ -15,6 +15,8 @@ interface Description {
 export class EditResultFormatter implements ShapeVisitor<Description> {
   format(result: EditResult): string {
     const description = result.shape.accept(this);
+    if ('attribute' in result) return `${description.label} ${result.action}: ${result.attribute}`;
+    if ('factor' in result) return `${description.label} ${result.action}${result.action === 'scaled' ? ` by ${result.factor}` : ''}`;
     if (!('dx' in result)) {
       const parent = result.shape.parent;
       const suffix = result.action === 'created' && parent && 'id' in parent ? ` in g#${parent.id}` : '';

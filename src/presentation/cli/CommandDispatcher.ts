@@ -17,6 +17,8 @@ export class CommandDispatcher {
       ['create', args => this.create(args)],
       ['tree', args => this.tree(args.map(token => token.value))],
       ['move', args => this.move(args.map(token => token.value))],
+      ['set', args => this.set(args.map(token => token.value))],
+      ['scale', args => this.scale(args.map(token => token.value))],
       ['undo', args => this.undo(args)],
       ['redo', args => this.redo(args)],
     ]);
@@ -78,6 +80,25 @@ export class CommandDispatcher {
     void this.session.document;
     if (args.length !== 0) throw new Error('usage: undo');
     return this.editFormatter.format(this.session.undo());
+  }
+
+  private set(args: string[]): string {
+    void this.session.document;
+    const [id, attribute, value] = args;
+    if (args.length !== 3 || id === undefined || attribute === undefined || value === undefined) {
+      throw new Error('usage: set <id> <attr> <value>');
+    }
+    const parsed = this.session.attributeKind(id, attribute) === 'number' ? this.parser.number(value) : value;
+    return this.editFormatter.format(this.session.set(id, attribute, parsed));
+  }
+
+  private scale(args: string[]): string {
+    void this.session.document;
+    const [id, factor] = args;
+    if (args.length !== 2 || id === undefined || factor === undefined) {
+      throw new Error('usage: scale <id> <factor>');
+    }
+    return this.editFormatter.format(this.session.scale(id, this.parser.number(factor)));
   }
 
   private redo(args: Token[]): string {

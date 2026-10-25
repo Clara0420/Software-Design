@@ -7,7 +7,7 @@ export class REPL {
 
   async run(input: Readable, output: Writable, terminal = false): Promise<void> {
     const lines = createInterface({ input, output, terminal, crlfDelay: Infinity });
-    output.write('svg-editor 0.1 — supported commands: init, create (rect/circle/ellipse/line/text/g), tree, move, undo, redo\n');
+    output.write('svg-editor 0.1 — supported commands: init, create (rect/circle/ellipse/line/text/g), tree, move, set, scale, undo, redo\n');
     lines.setPrompt('svg> ');
     if (terminal) lines.prompt();
     try {

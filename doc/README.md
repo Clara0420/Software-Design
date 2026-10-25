@@ -208,3 +208,19 @@ ShapeFactory 集中保存每种类型的构造器与参数元数据（名称、�
 本轮实现前识别并处理了反向位移无法精确恢复浮点数的问题；测试包括 0.1 + 0.2 和大位移抹去小坐标的情况。旧 CLI 测试中“move 是未知命令”改用尚未实现的 scale。新增历史顺序、失败 execute/undo/redo 保持栈、六类 create/move 撤销重做、嵌套混合组单步撤销、溢出失败、redo 分支清理、init 禁用与旧历史隔离、根级及子级创建顺序恢复测试，以及真实 CLI 会话回放。
 
 验证：全工程 TypeScript 检查、生产构建通过；Vitest 6 个文件、70 项测试全部通过。本轮未实现 read/save/canvas，因此没有预先决定这些操作之后旧历史的保留策略；后续实现时按需求增加相应历史限制。仍未实现其他编辑命令、SVG I/O、box 或插件。未新增依赖，未执行 Git Commit/Push/Tag。
+
+### set / scale 与撤销重做（2026-10-25）
+
+新增 `set <id> <attr> <value>` 和 `scale <id> <factor>`。SetCommand、ScaleCommand 通过 EditorSession 与现有 CommandHistory 执行，每次成功编辑只占一个历史单元；失败不入栈、不清空 redo，撤销后成功的新编辑清空 redo。命令只协调操作与保存恢复函数，不计算图形几何。
+
+白名单严格按 4.1：所有图形具有 fill、stroke、stroke-width；Rectangle 额外接受 x/y/width/height，Circle 接受 cx/cy/r，Ellipse 接受 cx/cy/rx/ry，Line 接受 x1/y1/x2/y2，TextShape 接受 x/y/text。Group 没有自身几何或文本属性。id、transform、font-size、别名 w/h、其他类型的几何属性等均报 `unknown attribute: <attr>`。Shape 提供公共样式绑定，各具体类自行提供几何属性绑定；CLI 从模型获取属性值类型后进行数值解析，不重复按图形类型分派。
+
+Group set 的递归范围依据本轮用户明确要求落实：仅公共样式可设置，同时更新当前 Group 和所有子孙；Group 上的 x、r、text 等仍拒绝。需求 4.1 未明确说明普通 Group 的样式传播细节，因此这是结合本轮“Group 递归操作”的具体实现约定，不将 box 的 label 等插件属性引入普通 Group。递归 set 先验证全树再应用。撤销恢复每个节点先前的独立样式，包括原来未设置的 undefined，不把 SVG 默认样式写成显式值。
+
+scale 的 factor 必须为有限正数，非正数报 `scale factor must be positive`；CLI 非数字仍沿用 `invalid number`。每种图形自己将全部几何属性（位置、尺寸）乘以 factor，Line 两端都缩放，TextShape 只缩放位置；fill/stroke/stroke-width 属样式，文本内容不参与缩放。Group 递归到每个后代，统一预验证后执行，避免某个坐标或尺寸溢出时留下部分状态。
+
+Shape.saveState 返回不暴露内部字段的恢复函数；具体类保存自身几何和文本，基类保存公共样式，Group 组合后代快照。SetCommand 和 ScaleCommand 使用该快照精确撤销，不用反向设置或倒数缩放，从而保留浮点数原值、缩放下溢前的值，以及不存在的样式属性。既有 MoveCommand 的位置快照继续使用。TreeFormatter 显示所有显式公共样式，方便检查 set 结果；EditResultFormatter 处理更新、缩放及撤销反馈。Presentation → Application → Domain 的依赖保持不变，没有新增类型名分派点。
+
+测试覆盖逐类型完整白名单、禁止属性、数值/尺寸校验、带引号和空文本、公共样式递归与独立旧值恢复、逐类型全部几何缩放、混合组一次撤销、非法 factor、溢出原子性、下溢后的精确恢复、create/move/set/scale 混合历史、redo 保留/清理，以及真实 CLI 会话与错误反馈。旧测试中“scale 尚未实现”改用 delete。
+
+验证：全工程类型检查和生产构建通过；Vitest 7 个文件、91 项测试全部通过。没有实现其他命令、SVG I/O、box 或插件，没有新增依赖，也未执行 Git Commit/Push/Tag。

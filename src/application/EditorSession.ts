@@ -4,6 +4,8 @@ import type { Shape } from '../domain/Shape.js';
 import { ShapeFactory, type ShapeParameters, type ParameterSpec } from '../domain/ShapeFactory.js';
 import { CreateCommand } from './commands/CreateCommand.js';
 import { MoveCommand } from './commands/MoveCommand.js';
+import { SetCommand } from './commands/SetCommand.js';
+import { ScaleCommand } from './commands/ScaleCommand.js';
 import type { EditResult } from './commands/EditResult.js';
 import { CommandHistory } from './CommandHistory.js';
 
@@ -48,6 +50,18 @@ export class EditorSession {
   undo(): EditResult {
     void this.document;
     return this.#history.undo();
+  }
+
+  attributeKind(id: string, attribute: string): 'number' | 'string' {
+    return this.findById(id).attributeKind(attribute);
+  }
+
+  set(id: string, attribute: string, value: number | string): EditResult {
+    return this.#history.execute(new SetCommand(this.findById(id), attribute, value));
+  }
+
+  scale(id: string, factor: number): EditResult {
+    return this.#history.execute(new ScaleCommand(this.findById(id), factor));
   }
 
   redo(): EditResult {

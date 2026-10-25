@@ -18,26 +18,31 @@ export class TreeFormatter implements ShapeVisitor<string> {
   }
 
   rectangle(shape: Rectangle): string {
-    const fill = shape.fill === undefined ? '' : ` fill=${shape.fill}`;
-    return `rect#${shape.id}  x=${shape.x} y=${shape.y} w=${shape.width} h=${shape.height}${fill}`;
+    return `rect#${shape.id}  x=${shape.x} y=${shape.y} w=${shape.width} h=${shape.height}${this.styles(shape)}`;
   }
 
-  group(shape: Group): string { return `g#${shape.id}`; }
+  group(shape: Group): string { return `g#${shape.id}${this.styles(shape)}`; }
 
   circle(shape: Circle): string {
-    return `circle#${shape.id}  cx=${shape.cx} cy=${shape.cy} r=${shape.r}${shape.fill === undefined ? '' : ` fill=${shape.fill}`}`;
+    return `circle#${shape.id}  cx=${shape.cx} cy=${shape.cy} r=${shape.r}${this.styles(shape)}`;
   }
 
   ellipse(shape: Ellipse): string {
-    return `ellipse#${shape.id}  cx=${shape.cx} cy=${shape.cy} rx=${shape.rx} ry=${shape.ry}${shape.fill === undefined ? '' : ` fill=${shape.fill}`}`;
+    return `ellipse#${shape.id}  cx=${shape.cx} cy=${shape.cy} rx=${shape.rx} ry=${shape.ry}${this.styles(shape)}`;
   }
 
   line(shape: Line): string {
-    return `line#${shape.id}  (${shape.x1},${shape.y1}) -> (${shape.x2},${shape.y2})${shape.stroke === undefined ? '' : ` stroke=${shape.stroke}`}`;
+    return `line#${shape.id}  (${shape.x1},${shape.y1}) -> (${shape.x2},${shape.y2})${this.styles(shape)}`;
   }
 
   text(shape: TextShape): string {
-    return `text#${shape.id}  (${shape.x},${shape.y}) ${JSON.stringify(shape.text)}`;
+    return `text#${shape.id}  (${shape.x},${shape.y}) ${JSON.stringify(shape.text)}${this.styles(shape)}`;
+  }
+
+  private styles(shape: Shape): string {
+    return (shape.fill === undefined ? '' : ` fill=${shape.fill}`)
+      + (shape.stroke === undefined ? '' : ` stroke=${shape.stroke}`)
+      + (shape.strokeWidth === undefined ? '' : ` stroke-width=${shape.strokeWidth}`);
   }
 
   private branches(children: readonly Shape[], prefix: string): string[] {

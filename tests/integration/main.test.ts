@@ -31,9 +31,9 @@ describe('CLI process', () => {
   });
 
   it('keeps processing after errors and rejects edits before initialization', () => {
-    const output = run('tree\ncreate rect r 0 0 1 1\nscale r 1\ninit\ncreate rect r 0 0 1 1\ntree\n');
+    const output = run('tree\ncreate rect r 0 0 1 1\ndelete r\ninit\ncreate rect r 0 0 1 1\ntree\n');
     expect(output.match(/error: no document/g)).toHaveLength(2);
-    expect(output).toContain('error: unknown command: scale');
+    expect(output).toContain('error: unknown command: delete');
     expect(output).toContain('└── rect#r  x=0 y=0 w=1 h=1');
   });
 
@@ -169,4 +169,28 @@ it('reports history/move syntax errors and does not revisit the old document aft
   expect(output).toContain('error: undo not allowed after io command');
   expect(output).toContain('error: nothing to undo');
   expect(output.endsWith('svg (800x600)\n└── g#fresh\n')).toBe(true);
+});
+
+
+it('runs recursive set/scale and undo/redo with exact errors in the real CLI', () => {
+  const output = run([
+    'set r fill red', 'scale r 2', 'init', 'set missing fill red', 'undo',
+    'create g g', 'create rect r 1 2 3 4 in g', 'create text t 5 6 "old" in g',
+    'set t text "new 中文 text"', 'set g stroke-width 2', 'scale g 2', 'tree',
+    'undo', 'undo', 'undo', 'tree', 'redo', 'redo', 'redo',
+    'set g x 4', 'set r id other', 'scale g 0', 'scale g -1',
+    'set r width -1', 'set r x nope', 'tree',
+  ].join('\n'));
+  expect(output.match(/error: no document/g)).toHaveLength(2);
+  expect(output).toContain('error: no such shape: missing');
+  expect(output).toContain('error: undo not allowed after io command');
+  expect(output).toContain('text#t updated: text');
+  expect(output).toContain('rect#r  x=2 y=4 w=6 h=8 stroke-width=2');
+  expect(output).toContain('text#t  (10,12) "new 中文 text" stroke-width=2');
+  expect(output).toContain('rect#r  x=1 y=2 w=3 h=4\n');
+  expect(output).toContain('text#t  (5,6) "old"\n');
+  expect(output).toContain('error: unknown attribute: x');
+  expect(output).toContain('error: unknown attribute: id');
+  expect(output.match(/error: scale factor must be positive/g)).toHaveLength(2);
+  expect(output).toContain('error: invalid number: nope');
 });
