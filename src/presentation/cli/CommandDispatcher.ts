@@ -22,6 +22,9 @@ export class CommandDispatcher {
       ['group', args => this.group(args.map(token => token.value))],
       ['ungroup', args => this.ungroup(args.map(token => token.value))],
       ['addto', args => this.addTo(args.map(token => token.value))],
+      ['delete', args => this.delete(args.map(token => token.value))],
+      ['front', args => this.reorder('front', args.map(token => token.value))],
+      ['back', args => this.reorder('back', args.map(token => token.value))],
       ['undo', args => this.undo(args)],
       ['redo', args => this.redo(args)],
     ]);
@@ -102,6 +105,18 @@ export class CommandDispatcher {
     void this.session.document;
     if (args.length !== 2 || args[0] === undefined || args[1] === undefined) throw new Error('usage: addto <gid> <id>');
     return this.editFormatter.format(this.session.addTo(args[0], args[1]));
+  }
+
+  private delete(args: string[]): string {
+    void this.session.document;
+    if (args.length !== 1 || args[0] === undefined) throw new Error('usage: delete <id>');
+    return this.editFormatter.format(this.session.delete(args[0]));
+  }
+
+  private reorder(edge: 'front' | 'back', args: string[]): string {
+    void this.session.document;
+    if (args.length !== 1 || args[0] === undefined) throw new Error(`usage: ${edge} <id>`);
+    return this.editFormatter.format(edge === 'front' ? this.session.front(args[0]) : this.session.back(args[0]));
   }
 
   private set(args: string[]): string {

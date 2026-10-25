@@ -27,4 +27,7 @@ export type EditResult = {
   readonly action: 'added to' | 'returned to';
   readonly shape: Shape;
   readonly container: Group | Document;
+} | {
+  readonly action: 'deleted' | 'restored' | 'brought to front' | 'sent to back' | 'order restored';
+  readonly shape: Shape;
 };

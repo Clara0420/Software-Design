@@ -31,9 +31,9 @@ describe('CLI process', () => {
   });
 
   it('keeps processing after errors and rejects edits before initialization', () => {
-    const output = run('tree\ncreate rect r 0 0 1 1\ndelete r\ninit\ncreate rect r 0 0 1 1\ntree\n');
+    const output = run('tree\ncreate rect r 0 0 1 1\nrotate r 90\ninit\ncreate rect r 0 0 1 1\ntree\n');
     expect(output.match(/error: no document/g)).toHaveLength(2);
-    expect(output).toContain('error: unknown command: delete');
+    expect(output).toContain('error: unknown command: rotate');
     expect(output).toContain('└── rect#r  x=0 y=0 w=1 h=1');
   });
 
@@ -225,4 +225,49 @@ it('reports root/cycle/selection errors and keeps structural redo intact', () =>
   expect(output).toContain('error: not a container: r');
   expect(output).toContain('error: usage: addto');
   expect(output.endsWith('svg (800x600)\n└── g#root\n    └── g#inner\n        └── g#pair\n            └── rect#r  x=0 y=0 w=1 h=1\n')).toBe(true);
+});
+
+it('deletes and restores a complete subtree with its IDs and original slot', () => {
+  const output = run([
+    'init', 'create g parent', 'create g before in parent', 'create g target in parent',
+    'create rect r 1 2 3 4 in target', 'create text t 5 6 "hello" in target',
+    'create g after in parent', 'delete target', 'tree', 'tree r',
+    'undo', 'tree', 'redo', 'tree target', 'undo', 'tree target',
+  ].join('\n'));
+  expect(output).toContain('g#target deleted');
+  expect(output).toContain('svg (800x600)\n└── g#parent\n    ├── g#before\n    └── g#after');
+  expect(output).toContain('error: no such shape: r');
+  expect(output).toContain('g#target restored');
+  expect(output).toContain('g#target\n├── rect#r  x=1 y=2 w=3 h=4\n└── text#t  (5,6) "hello"');
+  expect(output).toContain('error: no such shape: target');
+});
+
+it('moves root and nested shapes front/back and reverses each order change', () => {
+  const output = run([
+    'init', 'create g root', 'create g a in root', 'create g b in root',
+    'create g c in root', 'create rect child 0 0 1 1 in b',
+    'front a', 'tree', 'back c', 'tree', 'undo', 'undo', 'tree',
+  ].join('\n'));
+  expect(output).toContain('g#a brought to front');
+  expect(output).toContain('g#c sent to back');
+  expect(output).toContain('└── g#a');
+  expect(output).toContain('    ├── g#c\n    ├── g#b\n    │   └── rect#child');
+  expect(output.endsWith('svg (800x600)\n└── g#root\n    ├── g#a\n    ├── g#b\n    │   └── rect#child  x=0 y=0 w=1 h=1\n    └── g#c\n')).toBe(true);
+});
+
+it('reports delete/front/back errors without consuming redo', () => {
+  const output = run([
+    'delete r', 'front r', 'back r', 'init', 'create rect r 0 0 1 1',
+    'move r 2 3', 'undo', 'delete missing', 'front missing', 'back missing',
+    'delete', 'front r extra', 'back', 'redo', 'undo', 'delete r', 'redo', 'tree',
+  ].join('\n'));
+  expect(output.match(/error: no document/g)).toHaveLength(3);
+  expect(output.match(/error: no such shape: missing/g)).toHaveLength(3);
+  expect(output).toContain('error: usage: delete');
+  expect(output).toContain('error: usage: front');
+  expect(output).toContain('error: usage: back');
+  expect(output).toContain('rect#r moved to (2,3)');
+  expect(output).toContain('rect#r deleted');
+  expect(output).toContain('error: nothing to redo');
+  expect(output.endsWith('svg (800x600)\n')).toBe(true);
 });

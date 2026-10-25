@@ -92,6 +92,23 @@ export class Document {
     return new TreeChange(changes);
   }
 
+  planDelete(shape: Shape): TreeChange {
+    this.requireMember(shape);
+    const parent = shape.parent!;
+    return new TreeChange(new Map<Group | Document, readonly Shape[]>([
+      [parent, parent.children.filter(child => child !== shape)],
+    ]));
+  }
+
+  planReorder(shape: Shape, edge: 'front' | 'back'): TreeChange {
+    this.requireMember(shape);
+    const parent = shape.parent!;
+    const siblings = parent.children.filter(child => child !== shape);
+    if (edge === 'front') siblings.push(shape);
+    else siblings.unshift(shape);
+    return new TreeChange(new Map<Group | Document, readonly Shape[]>([[parent, siblings]]));
+  }
+
   private requireMember(shape: Shape): void {
     if (this.findById(shape.id) !== shape) throw new Error(`no such shape: ${shape.id}`);
   }

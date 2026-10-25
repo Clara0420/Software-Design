@@ -9,6 +9,8 @@ import { ScaleCommand } from './commands/ScaleCommand.js';
 import { GroupCommand } from './commands/GroupCommand.js';
 import { UngroupCommand } from './commands/UngroupCommand.js';
 import { AddToCommand } from './commands/AddToCommand.js';
+import { DeleteCommand } from './commands/DeleteCommand.js';
+import { ReorderCommand } from './commands/ReorderCommand.js';
 import type { EditResult } from './commands/EditResult.js';
 import { CommandHistory } from './CommandHistory.js';
 
@@ -83,6 +85,18 @@ export class EditorSession {
 
   addTo(groupId: string, id: string): EditResult {
     return this.#history.execute(new AddToCommand(this.document, this.findGroup(groupId), this.findById(id)));
+  }
+
+  delete(id: string): EditResult {
+    return this.#history.execute(new DeleteCommand(this.document, this.findById(id)));
+  }
+
+  front(id: string): EditResult {
+    return this.#history.execute(new ReorderCommand(this.document, this.findById(id), 'front'));
+  }
+
+  back(id: string): EditResult {
+    return this.#history.execute(new ReorderCommand(this.document, this.findById(id), 'back'));
   }
 
   private findGroup(id: string): Group {

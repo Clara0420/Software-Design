@@ -240,3 +240,17 @@ addto 将整个节点子树移到目标 Group 的最后；若节点已经在该 
 测试涵盖：同级非连续选择、逆序参数、跨容器及跨深度的 LCA/DFS 规则、单节点分组、子树身份保持、ungroup 原位展开和空组、根级限制、同父 addto 重排、向祖先提升、自身/后代循环、重复选择及 ID、错误后保留 redo、根和子节点顺序恢复、多次 undo/redo，以及 group/move/set/scale/addto/ungroup 混合历史。领域测试额外验证原子变更拒绝重复父容器、循环、ID 冲突、外文档节点和过期计划。真实 CLI 集成回放验证命令链及错误文本。
 
 验证：全工程 TypeScript 检查、生产构建通过；Vitest 9 个文件、108 项测试全部通过。未新增依赖，未实现其他命令、SVG I/O 或 box 插件，未执行 Git Commit/Push/Tag。
+
+### delete / front / back 与撤销重做（2026-10-25）
+
+本轮新增 `delete <id>`、`front <id>`、`back <id>` 及 DeleteCommand、ReorderCommand，沿用 EditorSession、CommandHistory 和领域层原子 TreeChange。每条成功命令是一个 undo 单元；失败不改变树或历史，undo 后成功的新编辑继续清空 redo。
+
+delete 从目标的直接父容器移除目标节点。删除 Group 时仅摘除子树根，保留同一批对象及其内部父子关系、顺序、几何和样式；因此整棵子树一起从 Document.findById 的可见范围消失。撤销将同一根节点插回原父容器的原索引，所有后代 ID 随树重新可查。重做再次摘除相同子树。删除后若执行新编辑，redo 按既有规则清空，不能借旧删除命令覆盖新占用的 ID。
+
+front/back 只读取目标的直接父容器并重排该层 children：SVG 后绘制的同级元素在视觉上更靠前，因此 front 移到同级末尾，back 移到同级开头。目标的父节点、子树内部顺序、几何、样式和其他容器均不变。已在边缘和唯一子节点上的操作仍视为成功编辑并占一个 undo 单元，行为与其他成功编辑一致。
+
+Document 新增 planDelete 和 planReorder，负责成员校验并生成 TreeChange；应用命令只保存计划并执行或回滚。TreeChange 保存受影响父容器的完整前后节点引用序列，恢复时继续经过 ShapeCollection 的 ID 唯一、单一父容器和无环校验。ID 查找仍直接遍历当前文档树，没有维护第二份可漂移的图形状态。
+
+测试覆盖叶子和多层 Group 删除、整棵子树 ID 消失与恢复、对象身份及原父节点/原索引恢复、根级与嵌套同级重排、子树内部顺序保持、边缘及唯一节点操作、失败保留 redo、成功编辑清空 redo、命令状态保护，以及 delete/front/back 与 group/move 等命令的混合历史。真实 CLI 回放验证成功反馈、错误反馈和最终 tree 顺序。
+
+验证：全工程 TypeScript 检查、生产构建通过；Vitest 11 个文件、123 项测试全部通过。未新增依赖，未实现 SVG I/O、box 或插件，未执行 Git Commit/Push/Tag。
